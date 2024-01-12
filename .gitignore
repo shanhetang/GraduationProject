@@ -1,6 +1,6 @@
 # 自己的
 data/
-
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
