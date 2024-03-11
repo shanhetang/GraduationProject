@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
 
-from model.utils import *
+from utils import *
 
 
 class SpacedRepetitionModel(object):

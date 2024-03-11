@@ -1,32 +1,19 @@
-import torch.optim.lr_scheduler
+import pandas as pd
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+import torch.optim.lr_scheduler
 import numpy as np
 import torch.nn.functional
 import matplotlib.pyplot as plt
 import time
 import math
-import pandas as pd
 from pathlib import Path
 from sklearn.utils import shuffle
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
-
-def l1_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual)
-
-
-def mse_loss(forecast, actual):
-    return nn.functional.mse_loss(forecast, actual)
-
-
-def mape_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual) / abs(actual)
-
-
-def smape_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual) / (abs(forecast) + abs(actual)) * 2
-
 
 def time_since(since):
     now = time.time()
@@ -35,33 +22,50 @@ def time_since(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
+def mape_loss(forecast, actual):
+    return nn.functional.l1_loss(forecast, actual) / abs(actual)
 
-class RNN(nn.Module):
-    def __init__(self, n_letters, n_hidden, n_categories, network):
-        super().__init__()
-        self.n_input = n_letters
-        self.n_hidden = n_hidden
-        self.n_out = n_categories
-        if network == 'GRU':
-            self.rnn = nn.GRU(self.n_input, self.n_hidden, 1)
-        elif network == "LSTM":
-            self.rnn = nn.LSTM(self.n_input, self.n_hidden, 1)
-        else:
-            self.rnn = nn.RNN(self.n_input, self.n_hidden, 1)
-        self.fc = nn.Linear(self.n_hidden, self.n_out)
 
-    def forward(self, x, hx):
-        x, h = self.rnn(x, hx=hx)
-        output = torch.exp(self.fc(x[-1]))
-        return output, h
+class TransformerModel(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_heads, num_layers, output_dim):
+        super(TransformerModel, self).__init__()
 
-    def full_connect(self, h):
-        return self.fc(h)
+        # 通过线性层将输入特征映射到隐藏层维度
+        self.fc = nn.Linear(input_dim, hidden_dim)
+
+        # Transformer模型
+        self.transformer = nn.Transformer(
+            d_model=hidden_dim,
+            nhead=num_heads,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dim_feedforward=hidden_dim * 4,
+            dropout=0.1,
+            batch_first=True
+        )
+
+        # 最终全连接层将Transformer输出映射到输出维度
+        self.fc_output = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, sample_tensor):
+        # 使用线性层映射输入特征到隐藏层维度
+        hidden = self.fc(sample_tensor)
+
+        # Transformer层
+        transformer_output = self.transformer(
+            src=hidden,
+            tgt=hidden,
+        )
+
+        # 选择最后一个时间步的输出
+        output = self.fc_output(transformer_output[-1, :, :])
+
+        return output
 
 
 class SpacedRepetitionModel(object):
     def __init__(self, train_set, test_set, omit_p_history=False, omit_t_history=False, hidden_nums=16, loss="MAPE",
-                 network="GRU"):
+                 network="TransformerModel"):
 
         self.n_hidden = hidden_nums  # 隐藏层数量
         self.omit_p = omit_p_history  # 是否省略p_history
@@ -72,8 +76,14 @@ class SpacedRepetitionModel(object):
             self.feature_num = 2
         else:
             self.feature_num = 3
+
         self.net_name = network  # 使用的网络
-        self.net = RNN(self.feature_num, self.n_hidden, 1, network)
+        # 模型初始化
+        num_heads = 4  # 多头自注意力机制的头数
+        num_layers = 2  # Transformer层数
+        output_dim = 1  # 输出的维度
+
+        self.net = TransformerModel(self.feature_num, self.n_hidden, num_heads, num_layers, output_dim)
         self.lr = 1e-3  # 学习率
         self.weight_decay = 1e-5  # 权重衰减 正则化
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)  # Adam优化器
@@ -85,20 +95,13 @@ class SpacedRepetitionModel(object):
         self.train_set = train_set
         self.test_set = test_set
         self.train_cnt = len(train_set)
-        self.n_iter = 1000000
+        self.n_iter = 100000
         self.n_epoch = int(self.n_iter / self.train_cnt + 1)  # 定义迭代次数
+        print(self.n_epoch)
         self.print_every = int(self.train_cnt / 4)  # 每一个epoch汇报4次进度
         self.plot_every = self.train_cnt  # 每一个epoch汇报1次进度
         self.loss_name = loss  # 损失函数
-        if loss == "MAPE":
-            self.loss = mape_loss
-        elif loss == "L1":
-            self.loss = l1_loss
-        elif loss == "MSE":
-            self.loss = mse_loss
-        elif loss == "sMAPE":
-            self.loss = smape_loss
-
+        self.loss = mape_loss
         self.writer = SummaryWriter(comment=self.write_title())  # SummaryWriter 是 PyTorch 提供的用于将信息写入 TensorBoard 的工具
 
     def write_title(self):
@@ -119,7 +122,7 @@ class SpacedRepetitionModel(object):
                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(train_set.loc[index])
                 self.net.train()
                 self.optimizer.zero_grad()  # 梯度清为0
-                output, _ = self.net(line_tensor, None)
+                output = self.net(line_tensor)
                 loss = self.loss(output[0], halflife_tensor) * weight
                 loss.backward()
                 self.optimizer.step()
@@ -150,7 +153,7 @@ class SpacedRepetitionModel(object):
                             for plot_index in dataset.index:
                                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(
                                     dataset.loc[plot_index])
-                                output, _ = self.net(line_tensor, None)
+                                output = self.net(line_tensor)
                                 loss = self.loss(output[0], halflife_tensor) * weight
                                 plot_loss += loss.data.item()
                                 plot_count += 1
@@ -167,15 +170,7 @@ class SpacedRepetitionModel(object):
             self.writer.add_scalar('train_loss', self.avg_train_losses[-1], i + 1)
             self.writer.add_scalar('eval_loss', self.avg_eval_losses[-1], i + 1)
 
-        # plt.figure()
-        # plt.plot(self.avg_train_losses, label='train')
-        # plt.plot(self.avg_eval_losses, label='eval')
         title = self.write_title()
-        # plt.title(f'{title}_lr:{self.lr}_wd:{self.weight_decay}')
-        # plt.ylabel('Average loss')
-        # plt.legend()
-        # plt.grid()
-        # plt.show()
         self.net.eval()
         # 保存模型
         path = f'./tmp/{title}'
@@ -201,7 +196,7 @@ class SpacedRepetitionModel(object):
             for index in tqdm(self.test_set.index):
                 sample = self.test_set.loc[index]
                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(sample)
-                output = self.net(line_tensor, None)
+                output = self.net(line_tensor)
                 output = float(output[0])
                 pp = np.exp(np.log(0.5) * sample['delta_t'] / output)
                 p = sample['p_recall']
@@ -252,3 +247,51 @@ class SpacedRepetitionModel(object):
         halflife_tensor = torch.tensor([halflife], dtype=torch.float32)
         # 返回半衰期、历史特征列表、半衰期张量、历史记录张量和样本的权重标准化信息
         return halflife, features, halflife_tensor, sample_tensor, sample[['weight_std']].values[0]
+
+# class HlrDataset(Dataset):
+#     def __init__(self, data, omit_p=False, omit_t=False):
+#         self.data = data
+#         self.omit_p = omit_p
+#         self.omit_t = omit_t
+#         if omit_t and omit_p:
+#             self.feature_num = 1
+#         elif omit_p or omit_t:
+#             self.feature_num = 2
+#         else:
+#             self.feature_num = 3
+#
+#     def __len__(self):
+#         return len(self.data)
+#
+#     def __getitem__(self, idx):
+#         sample = self.data.iloc[idx]
+#         halflife, features, halflife_tensor, sample_tensor, weight_std = self.sample2tensor(sample)
+#         return halflife_tensor, sample_tensor
+#
+#     def sample2tensor(self, sample):
+#         halflife = sample['halflife']
+#         features = [sample['r_history'], sample['t_history'], sample['p_history']]
+#         r_history = sample['r_history'].split(',')
+#         t_history = sample['t_history'].split(',')
+#         p_history = sample['p_history'].split(',')
+#         sample_tensor = torch.zeros(len(r_history), 1, self.feature_num)  # 初始化为一个三维张量
+#
+#         for li, response in enumerate(r_history):
+#             sample_tensor[li][0][0] = int(response)
+#             # 根据是否省略 p 或 t 特征，选择填充相应的历史数据
+#             if self.omit_p and self.omit_t:
+#                 continue
+#             elif self.omit_t and not self.omit_p:
+#                 sample_tensor[li][0][1] = float(p_history[li])
+#             elif self.omit_p and not self.omit_t:
+#                 sample_tensor[li][0][1] = float(t_history[li])
+#             else:
+#                 sample_tensor[li][0][1] = float(t_history[li])
+#                 sample_tensor[li][0][2] = float(p_history[li])
+#
+#         halflife_tensor = torch.tensor([halflife], dtype=torch.float32)
+#         # 返回半衰期、历史特征列表、半衰期张量、历史记录张量和样本的权重标准化信息
+#         return halflife, features, halflife_tensor, sample_tensor, sample[['weight_std']].values[0]
+
+
+

@@ -66,7 +66,7 @@ def to_percent(temp, position):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('./data/dataset_trans.csv')
+    data = pd.read_csv('../data/dataset_trans.csv')
     Path('./plot').mkdir(parents=True, exist_ok=True)
     plt.hist(data['p'], range=(0, 1), width=(1 / 20), bins=20, color='white', edgecolor='black')
     plt.ylabel("Number of samples", fontsize=24)

@@ -17,7 +17,8 @@ def load_data(input_file):
     dataset = dataset[dataset['halflife'] > 0]
     dataset = dataset[dataset['i'] > 0]
     dataset = dataset[
-        dataset['p_history'].map(lambda x: len(str(x).split(','))) == dataset['t_history'].map(lambda x: len(x.split(',')))]
+        dataset['p_history'].map(lambda x: len(str(x).split(','))) == dataset['t_history'].map(
+            lambda x: len(x.split(',')))]
     # dataset.drop_duplicates(subset=['r_history', 't_history', 'p_history', 'difficulty'], inplace=True)
     # dataset['weight'] = dataset['total_cnt'] / dataset['total_cnt'].sum()
     # dataset['weight'] = dataset['total_cnt'] / dataset['total_cnt'].sum()
@@ -64,19 +65,19 @@ def feature_extract(train_set, test_set, method, omit_lexemes=False):
     return instances['train'], instances['test']
 
 
+# 定义参数
 argparser = argparse.ArgumentParser(description='Fit a SpacedRepetitionModel to data.')
 argparser.add_argument('-l', action="store_true", default=False, help='omit lexeme features')
 argparser.add_argument('-p', action="store_true", default=False, help='omit p history features')
 argparser.add_argument('-t', action="store_true", default=False, help='omit t history features')
 argparser.add_argument('-test', action="store_true", default=False, help='test model')
 argparser.add_argument('-train', action="store_true", default=False, help='train model')
-argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2")
-argparser.add_argument('-hidden', action="store", dest="h", default='16', help="4, 8, 16, 32")
-argparser.add_argument('-loss', action="store", dest="loss", default='MAPE', help="MAPE, L1, MSE, sMAPE")
+argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2")  # 训练方法
+argparser.add_argument('-hidden', action="store", dest="h", default='16', help="4, 8, 16, 32")  # 隐藏层数量
+argparser.add_argument('-loss', action="store", dest="loss", default='MAPE', help="MAPE, L1, MSE, sMAPE")  # 损失函数
 argparser.add_argument('input_file', action="store", help='log file for training')
 
 if __name__ == "__main__":
-
     random.seed(2022)
     args = argparser.parse_args()
     sys.stderr.write('method = "%s"\n' % args.method)
@@ -89,9 +90,11 @@ if __name__ == "__main__":
     sys.stderr.write(f'{args.h} --> n_hidden\n')
     sys.stderr.write(f'{args.loss} --> loss\n')
 
+    # 读取数据 拆分训练集和测试集
     dataset = load_data(args.input_file)
     test = dataset.sample(frac=0.8, random_state=2022)
     train = dataset.drop(index=test.index)
+    # 根据传递的参数选择训练、测试方式
     if not args.train:
         if not args.test:
             train_train, train_test = train_test_split(train, test_size=0.5, random_state=2022)
@@ -117,7 +120,7 @@ if __name__ == "__main__":
                 model = SpacedRepetitionModel(train_train, train_test)
                 model.train()
                 model.eval(0, 0)
-        else:
+        else:  # -train -test
             # kf = KFold(n_splits=5, shuffle=True, random_state=2022)
             kf = RepeatedKFold(n_splits=2, n_repeats=5, random_state=2022)
             for idx, (train_index, test_fold) in enumerate(kf.split(test)):
@@ -161,7 +164,7 @@ if __name__ == "__main__":
             test['hh'] = np.log(test['pp']) / np.log(test['p_recall']) * test['delta_t']
             test['MAPE(h)'] = abs((test['hh'] - test['halflife']) / test['halflife'])
             print("MAPE(h)", test['MAPE(h)'].mean())
-    else:
+    else:  # -train
         # train_train, train_test = train_test_split(dataset, test_size=0.2, random_state=2022)
         sys.stderr.write('|train| = %d\n' % len(dataset))
         if args.method in rnn_algo:

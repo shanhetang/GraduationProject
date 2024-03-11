@@ -1,8 +1,8 @@
 import random
 
-from envrioment import GRU_HLR, DHP_HLR
+from ..envrioment import GRU_HLR, DHP_HLR
 
-from model.MEMORIZE import *
+from MEMORIZE import *
 
 sample_size = 1000
 max_cost = 200

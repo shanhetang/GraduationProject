@@ -2,20 +2,10 @@ import numpy as np
 import pandas as pd
 import torch
 
-epsilon = 0.01
+epsilon = 0.01  # ε（epsilon）通常用于表示误差项、极限过程中的无穷小量等。
 dim = 2
 
-d2p = [0.86,
-       0.78,
-       0.72,
-       0.66,
-       0.61,
-       0.55,
-       0.49,
-       0.44,
-       0.39,
-       0.34
-       ]
+d2p = [0.86,0.78,0.72,0.66,0.61,0.55,0.49,0.44,0.39,0.34]
 
 
 def discrete(s):

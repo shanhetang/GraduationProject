@@ -1,29 +1,31 @@
-import pandas as pd
+# step1 数据处理
 import numpy as np
-from tqdm import tqdm # 进度条库
+import pandas as pd
+import tqdm as tqdm
 
 d2p = [0.86,0.78,0.72,0.66,0.61,0.55,0.49,0.44,0.39,0.34]
-
-
+#
 def halflife_forgetting_curve(x, h):
     return np.power(2, - x / h)
 
 
+# 计算半衰期
 def cal_halflife(group):
-    if group['i'].values[0] > 1:
-        r_ivl_cnt = sum(group['delta_t'] * group['p_recall'].map(np.log) * group['total_cnt'])
+    # 计算半衰期
+    if group['i'].values[0] > 1:  # 记忆行为大于0
+        r_ivl_cnt = sum(group['delta_t'] * group['p_recall'].map(np.log) * group['total_cnt'])  #
         ivl_ivl_cnt = sum(group['delta_t'].map(lambda x: x ** 2) * group['total_cnt'])
         group['halflife'] = round(np.log(0.5) / (r_ivl_cnt / ivl_ivl_cnt), 4)
-    else:
+    else:  # 半衰期置为0
         group['halflife'] = 0.0
     group['group_cnt'] = sum(group['total_cnt'])
     return group
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('../data/opensource_dataset_forgetting_curve.tsv', sep='\t', index_col=None)
-    data = data[(data['p_recall'] < 1) & (data['p_recall'] > 0)]
-    data = data.groupby(by=['d', 'i', 'r_history', 't_history'],group_keys=False, as_index=False).apply(cal_halflife)  # 计算半衰期
+    data = pd.read_csv("./data/opensource_dataset_forgetting_curve.tsv",sep='\t',index_col=None)
+    data = data[(data['p_recall'] < 1 & (data['p_recall'] > 0))]  # 移除所有概率不合理的数据
+    data = data.groupby(by=['d','i','r_history','t_history']).apply(cal_halflife)  # 计算记忆行为相同的单词的半衰期
 
     data.reset_index(drop=True, inplace=True)
     data['p_recall'] = data['p_recall'].map(lambda x: round(x, 2))
@@ -34,7 +36,7 @@ if __name__ == "__main__":
     data = pd.read_csv('../data/opensource_dataset_halflife.tsv', sep='\t', index_col=None)
 
     for idx in tqdm(data[(data['i'] == 2)].index):
-        data.loc[idx, 'p_history'] = d2p[data.loc[idx, 'd']-1]
+        data.loc[idx, 'p_history'] = d2p[data.loc[idx, 'd'] - 1]
 
     data['p_history'] = data['p_history'].map(lambda x: str(x))
 
@@ -49,3 +51,5 @@ if __name__ == "__main__":
         data.loc[index, 'last_p_recall'] = item['p_recall']
 
     data.to_csv('../data/opensource_dataset_p_history.tsv', sep='\t', index=None)
+
+

@@ -10,7 +10,7 @@ import tqdm
 from model.utils import *
 from envrioment import DHP_HLR, GRU_HLR
 
-plt.style.use('seaborn-whitegrid')
+# plt.style.use('whitegrid')
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 camera = dict(
@@ -21,7 +21,7 @@ camera = dict(
 
 
 def difficulty_visualize():
-    raw = pd.read_csv('./data/opensource_dataset_difficulty.tsv', sep='\t')
+    raw = pd.read_csv('../data/opensource_dataset_difficulty.tsv', sep='\t')
     u = raw['p_recall'].mean()
     std = raw['p_recall'].std()
     print(u, std)
@@ -45,7 +45,7 @@ def difficulty_visualize():
 
 
 def forgetting_curve_visualize():
-    raw = pd.read_csv('./data/opensource_dataset_p_history.tsv', sep='\t')
+    raw = pd.read_csv('../data/opensource_dataset_p_history.tsv', sep='\t')
     filters = [(4, '0,1', '0,1'), (4, '0,1,1', '0,1,3'), (4, '0,1,1', '0,1,4'), (4, '0,1,1', '0,1,5')]
     fig = go.Figure()
     color = ['blue', 'red', 'green', 'orange']
@@ -481,10 +481,10 @@ def gru_model_visualize():
 
 
 if __name__ == "__main__":
-    difficulty_visualize()
+    # difficulty_visualize()
     forgetting_curve_visualize()
-    raw_data_visualize()
-    dhp_model_visualize()
-    gru_model_visualize()
-    dhp_policy_action_visualize()
-    gru_policy_action_visualize()
+    # raw_data_visualize()
+    # dhp_model_visualize()
+    # gru_model_visualize()
+    # dhp_policy_action_visualize()
+    # gru_policy_action_visualize()
