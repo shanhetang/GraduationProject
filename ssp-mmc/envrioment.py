@@ -46,6 +46,7 @@ class GRU_HLR(Student):
     def state2halflife(self, state):
         return np.exp(self.__model.full_connect(torch.tensor([[state]], dtype=torch.float))[-1].detach().numpy())[0][0]
 
+
     def __sample2tensor(self, sample):
         r_history = sample[0].split(',')
         t_history = sample[1].split(',')
