@@ -72,9 +72,10 @@ argparser.add_argument('-p', action="store_true", default=False, help='omit p hi
 argparser.add_argument('-t', action="store_true", default=False, help='omit t history features')
 argparser.add_argument('-test', action="store_true", default=False, help='test model')
 argparser.add_argument('-train', action="store_true", default=False, help='train model')
-argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2")  # 训练方法
-argparser.add_argument('-hidden', action="store", dest="h", default='16', help="4, 8, 16, 32")  # 隐藏层数量
-argparser.add_argument('-loss', action="store", dest="loss", default='MAPE', help="MAPE, L1, MSE, sMAPE")  # 损失函数
+argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2,Transformer")  # 训练方法
+argparser.add_argument('-hidden', action="store", dest="h", default='2', help="4, 8, 16, 32")  # 隐藏层数量
+argparser.add_argument('-hidden_dim', action="store", dest="hd", default='256', help="512, 1024")  # 隐藏层数量
+argparser.add_argument('-loss', action="store", dest="loss", default='sMAPE', help="MAPE, L1, MSE, sMAPE")  # 损失函数
 argparser.add_argument('input_file', action="store", help='log file for training')
 
 if __name__ == "__main__":
@@ -88,15 +89,20 @@ if __name__ == "__main__":
     if args.t:
         sys.stderr.write('--> omit_t_history\n')
     sys.stderr.write(f'{args.h} --> n_hidden\n')
+    sys.stderr.write(f'{args.hd} --> n_hidden_dim\n')
     sys.stderr.write(f'{args.loss} --> loss\n')
 
     # 读取数据 拆分训练集和测试集
+    # TODO
     dataset = load_data(args.input_file)
     test = dataset.sample(frac=0.8, random_state=2022)
     train = dataset.drop(index=test.index)
+    sys.stderr.write(str(test.shape)+"\n")
+    sys.stderr.write(str(train.shape)+"\n")
     # 根据传递的参数选择训练、测试方式
     if not args.train:
         if not args.test:
+            sys.stderr.write("without test and train\n")
             train_train, train_test = train_test_split(train, test_size=0.5, random_state=2022)
             sys.stderr.write('|train| = %d\n' % len(train_train))
             sys.stderr.write('|test|  = %d\n' % len(train_test))
@@ -111,7 +117,7 @@ if __name__ == "__main__":
                 from model.halflife_regression import SpacedRepetitionModel
 
                 train_fold, test_fold = feature_extract(train_train, train_test, args.method, args.l)
-                model = SpacedRepetitionModel(train_fold, test_fold, method=args.method)
+                model = SpacedRepetitionModel(train_fold, test_fold, method=args.method,omit_lexemes= args.l)
                 model.train()
                 model.eval(0, 0)
             elif args.method == 'DHP':
@@ -120,7 +126,16 @@ if __name__ == "__main__":
                 model = SpacedRepetitionModel(train_train, train_test)
                 model.train()
                 model.eval(0, 0)
-        else:  # -train -test
+            # TODO
+            elif args.method == 'Transformer':
+                from model.Transformer_HLR import SpacedRepetitionModel
+
+                model = SpacedRepetitionModel(train_train, train_test, omit_p_history=args.p, omit_t_history=args.t,
+                                              hidden_dim=int(args.hd), loss=args.loss, network=args.method)
+                model.train()
+                model.eval(0, 0)
+        else:  # -test
+            sys.stderr.write("-test")
             # kf = KFold(n_splits=5, shuffle=True, random_state=2022)
             kf = RepeatedKFold(n_splits=2, n_repeats=5, random_state=2022)
             for idx, (train_index, test_fold) in enumerate(kf.split(test)):
@@ -128,9 +143,9 @@ if __name__ == "__main__":
                 test_fold = dataset.iloc[test_fold]
                 repeat = idx // 2 + 1
                 fold = idx % 2 + 1
-                sys.stderr.write('Repeat %d, Fold %d\n' % (repeat, fold))
-                sys.stderr.write('|train| = %d\n' % len(train_index))
-                sys.stderr.write('|test|  = %d\n' % len(test_fold))
+                sys.stderr.write(f'Repeat {repeat}, Fold {fold}\n')
+                sys.stderr.write(f'|train| = {len(train_index)}\n')
+                sys.stderr.write(f'|test|  = {len(test_fold)}\n')
                 if args.method in rnn_algo:
                     from model.RNN_HLR import SpacedRepetitionModel
 
@@ -155,6 +170,15 @@ if __name__ == "__main__":
                     model = SpacedRepetitionModel(train_fold, test_fold)
                     model.train()
                     model.eval(repeat, fold)
+                # TODO
+                elif args.method == 'Transformer':
+                    from model.Transformer_HLR import SpacedRepetitionModel
+
+                    model = SpacedRepetitionModel(train_fold, test_fold, omit_p_history=args.p, omit_t_history=args.t,
+                                                  hidden_dim=int(args.hd), loss=args.loss, network=args.method)
+
+                    model.train()
+                    model.eval(repeat, fold)
                 else:
                     break
             test['pp'] = test['p_recall'].mean()
@@ -165,6 +189,7 @@ if __name__ == "__main__":
             test['MAPE(h)'] = abs((test['hh'] - test['halflife']) / test['halflife'])
             print("MAPE(h)", test['MAPE(h)'].mean())
     else:  # -train
+        print("-train")
         # train_train, train_test = train_test_split(dataset, test_size=0.2, random_state=2022)
         sys.stderr.write('|train| = %d\n' % len(dataset))
         if args.method in rnn_algo:
@@ -183,4 +208,11 @@ if __name__ == "__main__":
             from model.DHP import SpacedRepetitionModel
 
             model = SpacedRepetitionModel(dataset, dataset)
+            model.train()
+        # TODO
+        elif args.method == 'Transformer':
+            from model.Transformer_HLR import SpacedRepetitionModel
+
+            model = SpacedRepetitionModel(dataset,dataset,omit_p_history=args.p, omit_t_history=args.t,
+                                          hidden_dim=int(args.hd), loss=args.loss, network=args.method)
             model.train()

@@ -117,7 +117,7 @@ class SpacedRepetitionModel(object):
             for idx, index in enumerate(train_set.index):
                 # 半衰期、历史特征列表、半衰期张量、历史记录张量、样本的权重标准化信息
                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(train_set.loc[index])
-                self.net.train()
+                self.net.train() # 设置为训练模式
                 self.optimizer.zero_grad()  # 梯度清为0
                 output, _ = self.net(line_tensor, None)
                 loss = self.loss(output[0], halflife_tensor) * weight
@@ -176,15 +176,19 @@ class SpacedRepetitionModel(object):
         # plt.legend()
         # plt.grid()
         # plt.show()
-        self.net.eval()
+        self.net.eval() # eval模式
         # 保存模型
         path = f'./tmp/{title}'
         Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(self.net, f'{path}/model.pth')
         example_input = torch.rand(1, 1, self.feature_num)
-        example_hidden = torch.rand(1, 1, self.n_hidden)
-        fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden),
-                                                         'full_connect': example_hidden})
+        if self.net_name == "LSTM":
+            example_hidden = (torch.randn(1, 1, self.n_hidden), torch.randn(1, 1, self.n_hidden))
+            fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden)})
+        else:
+            example_hidden = torch.rand(1, 1, self.n_hidden)
+            fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden),
+                                                             'full_connect': example_hidden})
         fully_traced.save(f'{path}/model.pt')
         self.writer.add_graph(self.net, [example_input, example_hidden])
         self.writer.close()
