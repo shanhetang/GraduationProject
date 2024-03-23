@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import math
 from collections import namedtuple
-from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
+from sklearn.model_selection import train_test_split, RepeatedKFold
 
 Instance = namedtuple('Instance', 'p t fv h a r_history t_history p_history'.split())
 duolingo_algo = ('HLR', 'LR', 'leitner', 'pimsleur')
@@ -74,7 +74,7 @@ argparser.add_argument('-test', action="store_true", default=False, help='test m
 argparser.add_argument('-train', action="store_true", default=False, help='train model')
 argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2,Transformer")  # 训练方法
 argparser.add_argument('-hidden', action="store", dest="h", default='2', help="4, 8, 16, 32")  # 隐藏层数量
-argparser.add_argument('-hidden_dim', action="store", dest="hd", default='256', help="512, 1024")  # 隐藏层数量
+argparser.add_argument('-hidden_dim', action="store", dest="hd", default='16', help="512, 1024")  # 隐藏层数量
 argparser.add_argument('-loss', action="store", dest="loss", default='sMAPE', help="MAPE, L1, MSE, sMAPE")  # 损失函数
 argparser.add_argument('input_file', action="store", help='log file for training')
 
@@ -128,8 +128,8 @@ if __name__ == "__main__":
                 model.eval(0, 0)
             # TODO
             elif args.method == 'Transformer':
-                from model.Transformer_HLR import SpacedRepetitionModel
-
+                from model.Transformer_HLR2 import SpacedRepetitionModel
+                print("Transformer_HLR2")
                 model = SpacedRepetitionModel(train_train, train_test, omit_p_history=args.p, omit_t_history=args.t,
                                               hidden_dim=int(args.hd), loss=args.loss, network=args.method)
                 model.train()
@@ -172,7 +172,7 @@ if __name__ == "__main__":
                     model.eval(repeat, fold)
                 # TODO
                 elif args.method == 'Transformer':
-                    from model.Transformer_HLR import SpacedRepetitionModel
+                    from model.Transformer_HLR2 import SpacedRepetitionModel
 
                     model = SpacedRepetitionModel(train_fold, test_fold, omit_p_history=args.p, omit_t_history=args.t,
                                                   hidden_dim=int(args.hd), loss=args.loss, network=args.method)
@@ -211,7 +211,7 @@ if __name__ == "__main__":
             model.train()
         # TODO
         elif args.method == 'Transformer':
-            from model.Transformer_HLR import SpacedRepetitionModel
+            from model.Transformer_HLR2 import SpacedRepetitionModel
 
             model = SpacedRepetitionModel(dataset,dataset,omit_p_history=args.p, omit_t_history=args.t,
                                           hidden_dim=int(args.hd), loss=args.loss, network=args.method)
