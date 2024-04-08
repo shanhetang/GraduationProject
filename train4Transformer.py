@@ -97,11 +97,11 @@ if __name__ == "__main__":
                 from model.Transformer_HLR import SpacedRepetitionModel
 
                 sys.stderr.write('method = "%s"\n' % args.method)
-                sys.stderr.write(f'16 --> n_layers\n')
+                sys.stderr.write(f'4 --> n_layers\n')
                 sys.stderr.write(f'256 --> n_hidden_dim\n')
                 sys.stderr.write(f'3 --> kernel_size\n')
                 sys.stderr.write(f'{args.loss} --> loss\n')
-                model = SpacedRepetitionModel(train_train, train_test, n_heads=8, hidden_dim=256, num_layers=16,
+                model = SpacedRepetitionModel(train_train, train_test, n_heads=8, hidden_dim=256, num_layers=4,
                                               kernel_size=3,
                                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                                               network=args.method)
