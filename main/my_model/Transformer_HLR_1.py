@@ -374,13 +374,11 @@ class SpacedRepetitionModel(object):
 
     def sample2tensor(self, sample):
         halflife = sample['halflife']
-        diff = sample['d']
         features = [sample['r_history'], sample['t_history'], sample['p_history']]
         r_history = sample['r_history'].split(',')
         t_history = sample['t_history'].split(',')
         p_history = sample['p_history'].split(',')
 
-        halflife_tensor = torch.tensor([halflife], dtype=torch.float32)
         halflife_tensor = torch.tensor([halflife], dtype=torch.float32)
         sample_tensor = torch.zeros(1, len(r_history), self.feature_num)
         for li, response in enumerate(r_history):
