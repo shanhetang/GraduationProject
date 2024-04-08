@@ -163,11 +163,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-/ssp-mmc/result/
-/ssp-mmc/runs/
-/ssp-mmc/tmp/
+/main/result/
+/main/runs/
+/main/tmp/
 /learn/
 /runs/
-/ssp-mmc/plot/
+/main/plot/
 /tmp/
-/ssp-mmc/SSP-MMC/.vscode/
+/main/SSP-MMC/.vscode/

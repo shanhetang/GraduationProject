@@ -85,7 +85,7 @@ class LearnablePositionalEncoding(nn.Module):
     def forward(self, x):
         r"""Inputs of forward function
         Args:
-            x: the sequence fed to the positional encoder model (required).
+            x: the sequence fed to the positional encoder my_model (required).
         Shape:
             x: [batch size, sequence length, embed dim]
             output: [batch size, sequence length, embed dim]
@@ -283,10 +283,10 @@ class SpacedRepetitionModel(object):
         # 保存模型
         path = f'./tmp/{title}'
         Path(path).mkdir(parents=True, exist_ok=True)
-        torch.save(self.net, f'{path}/model.pth')
+        torch.save(self.net, f'{path}/my_model.pth')
         # example_input = torch.rand(1, 1, self.feature_num)
         # fully_traced = torch.jit.trace_module(self.net, {'forward': example_input})
-        # fully_traced.save(f'{path}/model.pt')
+        # fully_traced.save(f'{path}/my_model.pt')
         # self.writer.add_graph(self.net, example_input)
         # self.writer.close()
 
@@ -323,7 +323,7 @@ class SpacedRepetitionModel(object):
                      'pp': [round(pp, 3)], 'ae': [round(abs(p - pp), 3)],
                      'ape': [round(abs(output - sample['halflife']) / sample['halflife'], 3)]})],
                                    ignore_index=True)
-            print(f"model: transformer")
+            print(f"my_model: transformer")
             print(f'sample num: {count}')
             print(f"mae: {ae / count}")
             print(f"mape: {ape / count}")

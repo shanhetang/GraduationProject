@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import math
 from collections import namedtuple
-from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
+from sklearn.model_selection import train_test_split, RepeatedKFold
 
 Instance = namedtuple('Instance', 'p t fv h a r_history t_history p_history'.split())
 
@@ -66,8 +66,8 @@ def feature_extract(train_set, test_set, method, omit_lexemes=False):
 argparser = argparse.ArgumentParser(description='Fit a SpacedRepetitionModel to data.')
 argparser.add_argument('-p', action="store_true", default=False, help='omit p history features')
 argparser.add_argument('-t', action="store_true", default=False, help='omit t history features')
-argparser.add_argument('-test', action="store_true", default=False, help='test model')
-argparser.add_argument('-train', action="store_true", default=False, help='train model')
+argparser.add_argument('-test', action="store_true", default=False, help='test my_model')
+argparser.add_argument('-train', action="store_true", default=False, help='train my_model')
 argparser.add_argument('-m', action="store", dest="method", default='Transformer',
                        help="LSTM, HLR, LR, SM2,Transformer")  # 训练方法
 argparser.add_argument('-hidden', action="store", dest="h", default='2', help="4, 8, 16, 32")  # 隐藏层数量
@@ -94,7 +94,7 @@ if __name__ == "__main__":
             sys.stderr.write('|test|  = %d\n' % len(train_test))
             # TODO
             if args.method == 'Transformer':
-                from model.Transformer_HLR import SpacedRepetitionModel
+                from main.my_model.Transformer_HLR import SpacedRepetitionModel
 
                 sys.stderr.write('method = "%s"\n' % args.method)
                 sys.stderr.write(f'4 --> n_layers\n')
@@ -113,10 +113,10 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'256 --> n_hidden_dim\n')
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4,hidden_dim=256, num_layers=2, kernel_size=3,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4,hidden_dim=256, num_layers=2, kernel_size=3,
                 #                               omit_p_history=False, omit_t_history=False,loss=args.loss, network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 2
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -125,12 +125,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
                 # sys.stderr.write('--> omit_p_history\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
                 #                               kernel_size=3,
                 #                               omit_p_history=True, omit_t_history=False, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 3
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -139,12 +139,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
                 # sys.stderr.write('--> omit_t_history\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
                 #                               kernel_size=3,
                 #                               omit_p_history=False, omit_t_history=True, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 4
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -154,12 +154,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'{args.loss} --> loss\n')
                 # sys.stderr.write('--> omit_p_history\n')
                 # sys.stderr.write('--> omit_t_history\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
                 #                               kernel_size=3,
                 #                               omit_p_history=True, omit_t_history=True, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 5
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -169,12 +169,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'{args.loss} --> loss\n')
                 # sys.stderr.write('--> omit_p_history\n')
                 # sys.stderr.write('--> omit_t_history\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
                 #                               kernel_size=3,
                 #                               omit_p_history=True, omit_t_history=True, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 6
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -182,12 +182,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'256 --> n_hidden_dim\n')
                 # sys.stderr.write(f'1 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=2,
                 #                               kernel_size=1,
                 #                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 7
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -195,12 +195,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'256 --> n_hidden_dim\n')
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=4,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=4,
                 #                               kernel_size=3,
                 #                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 8
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -208,12 +208,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'256 --> n_hidden_dim\n')
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=8,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=256, num_layers=8,
                 #                               kernel_size=3,
                 #                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
                 # # 9
                 # sys.stderr.write('----------------------------------------------------------------')
                 # sys.stderr.write('method = "%s"\n' % args.method)
@@ -221,12 +221,12 @@ if __name__ == "__main__":
                 # sys.stderr.write(f'128 --> n_hidden_dim\n')
                 # sys.stderr.write(f'3 --> kernel_size\n')
                 # sys.stderr.write(f'{args.loss} --> loss\n')
-                # model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=128, num_layers=2,
+                # my_model = SpacedRepetitionModel(train_train, train_test, n_heads=4, hidden_dim=128, num_layers=2,
                 #                               kernel_size=3,
                 #                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                 #                               network=args.method)
-                # model.train()
-                # model.eval(0, 0)
+                # my_model.train()
+                # my_model.eval(0, 0)
         else:  # -test
             sys.stderr.write("-test")
             # kf = KFold(n_splits=5, shuffle=True, random_state=2022)
@@ -241,7 +241,7 @@ if __name__ == "__main__":
                 sys.stderr.write(f'|test|  = {len(test_fold)}\n')
                 # TODO
                 if args.method == 'Transformer':
-                    from model.Transformer_HLR import SpacedRepetitionModel
+                    from main.my_model.Transformer_HLR import SpacedRepetitionModel
 
                     model = SpacedRepetitionModel(train_fold, test_fold, omit_p_history=args.p, omit_t_history=args.t,
                                                   hidden_dim=int(args.hd), loss=args.loss, network=args.method)
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         sys.stderr.write('|train| = %d\n' % len(dataset))
         # TODO
         if args.method == 'Transformer':
-            from model.Transformer_HLR import SpacedRepetitionModel
+            from main.my_model.Transformer_HLR import SpacedRepetitionModel
 
             model = SpacedRepetitionModel(dataset, dataset, omit_p_history=args.p, omit_t_history=args.t,
                                           hidden_dim=int(args.hd), loss=args.loss, network=args.method)

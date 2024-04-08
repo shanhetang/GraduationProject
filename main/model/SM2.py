@@ -1,6 +1,6 @@
 import time
 import pandas as pd
-from model.utils import *
+from my_model.utils import *
 
 responses_dict = {'1': 1, '2': 0, '3': 0}
 
@@ -44,7 +44,7 @@ def eval(testset, repeat, fold):
         for j in range(line_tensor.size()[0]):
             n, ef, i = sm2(line_tensor[j][0], n, ef, i)
 
-        # print(f'model: {m}\tsample: {line}\tcorrect: {interval}\tpredict: {float(output)}')
+        # print(f'my_model: {m}\tsample: {line}\tcorrect: {interval}\tpredict: {float(output)}')
         pp = np.exp(np.log(0.9) * line['t'] / i)
         p = line['p']
         loss += abs(p - pp)

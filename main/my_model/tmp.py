@@ -20,12 +20,12 @@ def model_factory(config, data):
             raise x
 
     if (task == "imputation") or (task == "transduction"):
-        if config['model'] == 'LINEAR':
+        if config['my_model'] == 'LINEAR':
             return DummyTSTransformerEncoder(feat_dim, max_seq_len, config['d_model'], config['num_heads'],
                                              config['num_layers'], config['dim_feedforward'], dropout=config['dropout'],
                                              pos_encoding=config['pos_encoding'], activation=config['activation'],
                                              norm=config['normalization_layer'], freeze=config['freeze'])
-        elif config['model'] == 'transformer':
+        elif config['my_model'] == 'transformer':
             return TSTransformerEncoder(feat_dim, max_seq_len, config['d_model'], config['num_heads'],
                                         config['num_layers'], config['dim_feedforward'], dropout=config['dropout'],
                                         pos_encoding=config['pos_encoding'], activation=config['activation'],
@@ -33,7 +33,7 @@ def model_factory(config, data):
 
     if (task == "classification") or (task == "regression"):
         num_labels = len(data.class_names) if task == "classification" else data.labels_df.shape[1]  # dimensionality of labels
-        if config['model'] == 'LINEAR':
+        if config['my_model'] == 'LINEAR':
             return DummyTSTransformerEncoderClassiregressor(feat_dim, max_seq_len, config['d_model'],
                                                             config['num_heads'],
                                                             config['num_layers'], config['dim_feedforward'],
@@ -41,7 +41,7 @@ def model_factory(config, data):
                                                             dropout=config['dropout'], pos_encoding=config['pos_encoding'],
                                                             activation=config['activation'],
                                                             norm=config['normalization_layer'], freeze=config['freeze'])
-        elif config['model'] == 'transformer':
+        elif config['my_model'] == 'transformer':
             return TSTransformerEncoderClassiregressor(feat_dim, max_seq_len, config['d_model'],
                                                         config['num_heads'],
                                                         config['num_layers'], config['dim_feedforward'],
@@ -92,7 +92,7 @@ class FixedPositionalEncoding(nn.Module):
     def forward(self, x):
         r"""Inputs of forward function
         Args:
-            x: the sequence fed to the positional encoder model (required).
+            x: the sequence fed to the positional encoder my_model (required).
         Shape:
             x: [sequence length, batch size, embed dim]
             output: [sequence length, batch size, embed dim]
@@ -115,7 +115,7 @@ class LearnablePositionalEncoding(nn.Module):
     def forward(self, x):
         r"""Inputs of forward function
         Args:
-            x: the sequence fed to the positional encoder model (required).
+            x: the sequence fed to the positional encoder my_model (required).
         Shape:
             x: [sequence length, batch size, embed dim]
             output: [sequence length, batch size, embed dim]
@@ -142,7 +142,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
     Args:
         d_model: the number of expected features in the input (required).
         nhead: the number of heads in the multiheadattention models (required).
-        dim_feedforward: the dimension of the feedforward network model (default=2048).
+        dim_feedforward: the dimension of the feedforward network my_model (default=2048).
         dropout: the dropout value (default=0.1).
         activation: the activation function of intermediate layer, relu or gelu (default=relu).
     """
@@ -150,7 +150,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super(TransformerBatchNormEncoderLayer, self).__init__()
         self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
-        # Implementation of Feedforward model
+        # Implementation of Feedforward my_model
         self.linear1 = Linear(d_model, dim_feedforward)
         self.dropout = Dropout(dropout)
         self.linear2 = Linear(dim_feedforward, d_model)

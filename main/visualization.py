@@ -7,7 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import tqdm
 
-from model.utils import *
+from my_model.utils import *
 from envrioment import DHP_HLR, GRU_HLR
 
 # plt.style.use('whitegrid')
@@ -205,7 +205,7 @@ def dhp_model_visualize():
 
 def gru_model_visualize():
     model = GRU_HLR()
-    # for name, param in model.named_parameters():
+    # for name, param in my_model.named_parameters():
     #     print(name, param)
     recall_record = np.array([0, 0, 0])
     forget_record = np.array([0, 0, 0])
@@ -214,7 +214,7 @@ def gru_model_visualize():
         # # print(f'current state: {s1:.2f} {s2:.2f}\thalflife: {h: .2f}')
         # for t in np.arange(1, max(1, round(2 * h)) + 1, max(1, round(h / 10))):
         #     p = np.exp2(-t / h)
-        #     n_state, nh = model.next_state(np.array([s1, s2]), 1, t, p)
+        #     n_state, nh = my_model.next_state(np.array([s1, s2]), 1, t, p)
         #     ns1, ns2 = n_state
         for p in np.arange(0.35, 0.96, 0.05):
             t = int(np.round(- np.log2(p) * h))

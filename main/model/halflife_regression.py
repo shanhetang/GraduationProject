@@ -30,7 +30,7 @@ Instance = namedtuple('Instance', 'p t fv h a right wrong spelling'.split())
 
 class SpacedRepetitionModel(object):
     """
-    Spaced repetition model. Implements the following approaches:
+    Spaced repetition my_model. Implements the following approaches:
       - 'HLR' (half-life regression; trainable)
       - 'LR' (logistic regression; trainable)
       - 'leitner' (fixed)
@@ -218,7 +218,7 @@ class SpacedRepetitionModel(object):
 
 
 def pclip(p):
-    # bound min/max model predictions (helps with loss optimization)
+    # bound min/max my_model predictions (helps with loss optimization)
     return min(max(p, 0.0001), .9999)
 
 
@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     args = argparser.parse_args()
 
-    # model diagnostics
+    # my_model diagnostics
     sys.stderr.write('method = "%s"\n' % args.method)
     if args.b:
         sys.stderr.write('--> omit_bias\n')
@@ -321,11 +321,11 @@ if __name__ == "__main__":
     sys.stderr.write('|train| = %d\n' % len(trainset))
     sys.stderr.write('|test|  = %d\n' % len(testset))
 
-    # train model & print preliminary evaluation info
+    # train my_model & print preliminary evaluation info
     model = SpacedRepetitionModel(trainset, testset, method=args.method, omit_h_term=args.t)
     model.train()
 
-    # write out model weights and predictions
+    # write out my_model weights and predictions
     filebits = [args.method] + \
                [k for k, v in sorted(vars(args).items()) if v is True] + \
                [os.path.splitext(os.path.basename(args.input_file).replace('.gz', ''))[0]]
@@ -336,4 +336,4 @@ if __name__ == "__main__":
         os.makedirs('results/')
     model.dump_weights('results/' + filebase + '.weights.tsv')
     model.dump_predictions('results/' + filebase + '.preds.tsv', testset)
-    # model.dump_detailed_predictions('results/'+filebase+'.detailed', testset)
+    # my_model.dump_detailed_predictions('results/'+filebase+'.detailed', testset)

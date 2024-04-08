@@ -125,7 +125,7 @@ class SpacedRepetitionModel(object):
             for j in range(line_tensor.size()[0]):
                 ph, d = self.dhp(line_tensor[j][0], ph, d)
 
-            # print(f'model: {m}\tsample: {line}\tcorrect: {interval}\tpredict: {float(output)}')
+            # print(f'my_model: {m}\tsample: {line}\tcorrect: {interval}\tpredict: {float(output)}')
 
             pp = np.power(2, -line['delta_t'] / ph)
             p = line['p_recall']
@@ -143,7 +143,7 @@ class SpacedRepetitionModel(object):
                  'pp': [round(pp, 3)], 'ae': [round(abs(p - pp), 3)],
                  'ape': [round(abs(ph - h) / h, 3)]})],
                                ignore_index=True)
-        print(f"model: DHP")
+        print(f"my_model: DHP")
         print(f'sample num: {count}')
         print(f"avg p loss: {p_loss / count}")
         print(f"avg h loss: {h_loss / count}")
@@ -156,4 +156,4 @@ class SpacedRepetitionModel(object):
             {'ra': [self.ra], 'rb': [self.rb], 'rc': [self.rc], 'rd': [self.rd], 'fa': [self.fa], 'fb': [self.fb],
              'fc': [self.fc],
              'fd': [self.fd]})
-        parameters.to_csv('./tmp/DHP/model.csv', index=False)
+        parameters.to_csv('./tmp/DHP/my_model.csv', index=False)

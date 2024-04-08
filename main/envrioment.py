@@ -26,7 +26,7 @@ class Student(object):
 class GRU_HLR(Student):
     def __init__(self):
         super().__init__()
-        self.__model = torch.jit.load(f'./tmp/nn-GRU_nh-{dim}_loss-sMAPE/model.pt')
+        self.__model = torch.jit.load(f'./tmp/nn-GRU_nh-{dim}_loss-sMAPE/my_model.pt')
         self.__model.eval()
 
     def init(self, difficulty):
@@ -63,7 +63,7 @@ class GRU_HLR(Student):
 class DHP_HLR(Student):
     def __init__(self):
         super().__init__()
-        parameters = pd.read_csv('./tmp/DHP/model.csv', index_col=None)
+        parameters = pd.read_csv('./tmp/DHP/my_model.csv', index_col=None)
         self.__ra = parameters['ra'].values[0]
         self.__rb = parameters['rb'].values[0]
         self.__rc = parameters['rc'].values[0]

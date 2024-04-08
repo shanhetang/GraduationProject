@@ -247,7 +247,7 @@ class SpacedRepetitionModel(object):
         torch.save(self.net, f'{path}/model.pth')
         # example_input = torch.rand(1, 1, self.feature_num)
         # fully_traced = torch.jit.trace_module(self.net, {'forward': example_input})
-        # fully_traced.save(f'{path}/model.pt')
+        # fully_traced.save(f'{path}/my_model.pt')
         # self.writer.add_graph(self.net, example_input)
         # self.writer.close()
 
