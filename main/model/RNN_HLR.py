@@ -37,11 +37,11 @@ def time_since(since):
 
 
 class RNN(nn.Module):
-    def __init__(self, n_letters, n_hidden, n_categories, network):
+    def __init__(self, n_letters, n_hidden, n_output, network):
         super().__init__()
         self.n_input = n_letters
         self.n_hidden = n_hidden
-        self.n_out = n_categories
+        self.n_out = n_output
         if network == 'GRU':
             self.rnn = nn.GRU(self.n_input, self.n_hidden, 1)
         elif network == "LSTM":
@@ -89,6 +89,7 @@ class SpacedRepetitionModel(object):
         self.n_epoch = int(self.n_iter / self.train_cnt + 1)  # 定义迭代次数
         self.print_every = int(self.train_cnt / 4)  # 每一个epoch汇报4次进度
         self.plot_every = self.train_cnt  # 每一个epoch汇报1次进度
+
         self.loss_name = loss  # 损失函数
         if loss == "MAPE":
             self.loss = mape_loss

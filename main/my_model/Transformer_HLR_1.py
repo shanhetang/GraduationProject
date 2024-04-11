@@ -174,7 +174,7 @@ class TransformerModel(nn.Module):
         """
         shape
          sample_tensor: [batch size, sequence length, feat_dim]
-            output: [batch size, sequence length,  feat_dim]
+            output: [batch size, sequence length,  output_dim]
         """
         t_src = self.conv(sample_tensor)
 
@@ -182,7 +182,7 @@ class TransformerModel(nn.Module):
 
         t_output = self.transformer_encoder(src=t_src)
 
-        output = self.decoder(t_output)
+        output = torch.exp(self.decoder(t_output))
         return output
 
 
@@ -252,8 +252,8 @@ class SpacedRepetitionModel(object):
         self.writer = SummaryWriter(comment=self.write_title())
 
     def write_title(self):
-        title = f'{self.net_name}-d_model={self.d_model}-nhead={self.num_heads}-encoder_num={self.num_layers}' \
-                f'-loss={self.loss_name}-epoch={self.n_epoch}'
+        title = f'exp-{self.net_name}-d_model={self.d_model}-nhead={self.num_heads}-encoder_num={self.num_layers}' \
+                f'-loss={self.loss_name}'
         if self.kernel_size != 3:
             title += "-k=" + str(self.kernel_size)
         if self.omit_p:
@@ -329,6 +329,7 @@ class SpacedRepetitionModel(object):
         path = f'./tmp/{title}'
         Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(self.net, f'{path}/model.pth')
+        self.writer.close()
 
     def eval(self, repeat, fold):
         record = pd.DataFrame(

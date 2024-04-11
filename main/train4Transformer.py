@@ -101,7 +101,7 @@ if __name__ == "__main__":
                 sys.stderr.write(f'256 --> n_hidden_dim\n')
                 sys.stderr.write(f'3 --> kernel_size\n')
                 sys.stderr.write(f'{args.loss} --> loss\n')
-                model = SpacedRepetitionModel(train_train, train_test, n_heads=8, hidden_dim=256, num_layers=4,
+                model = SpacedRepetitionModel(train_train, train_test, n_heads=8, d_model=256, num_layers=4,
                                               kernel_size=3,
                                               omit_p_history=False, omit_t_history=False, loss=args.loss,
                                               network=args.method)

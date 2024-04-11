@@ -5,14 +5,13 @@ Implementation of Temporal Fusion Transformers: https://arxiv.org/abs/1912.09363
 from torch import nn
 import math
 import torch
-import ipdb
 
 
+# 损失函数
 class QuantileLoss(nn.Module):
-    ## From: https://medium.com/the-artificial-impostor/quantile-regression-part-2-6fdbc26b2629
-
+    # From: https://medium.com/the-artificial-impostor/quantile-regression-part-2-6fdbc26b2629
     def __init__(self, quantiles):
-        ##takes a list of quantiles
+        # takes a list of quantiles
         super().__init__()
         self.quantiles = quantiles
 
@@ -23,18 +22,16 @@ class QuantileLoss(nn.Module):
         for i, q in enumerate(self.quantiles):
             errors = target - preds[:, i]
             losses.append(
-                torch.max(
-                    (q - 1) * errors,
-                    q * errors
-                ).unsqueeze(1))
+                torch.max((q - 1) * errors,q * errors).unsqueeze(1))
         loss = torch.mean(
             torch.sum(torch.cat(losses, dim=1), dim=1))
         return loss
 
 
+# 将输入张量的时间维度与批次维度堆叠在一起
 class TimeDistributed(nn.Module):
-    ## Takes any module and stacks the time dimension with the batch dimenison of inputs before apply the module
-    ## From: https://discuss.pytorch.org/t/any-pytorch-function-can-work-as-keras-timedistributed/1346/4
+    # Takes any module and stacks the time dimension with the batch dimenison of inputs before apply the module
+    # From: https://discuss.pytorch.org/t/any-pytorch-function-can-work-as-keras-timedistributed/1346/4
     def __init__(self, module, batch_first=False):
         super(TimeDistributed, self).__init__()
         self.module = module
@@ -42,7 +39,7 @@ class TimeDistributed(nn.Module):
 
     def forward(self, x):
 
-        if len(x.size()) <= 2:
+        if len(x.size()) <= 2: # 不包含时间维度
             return self.module(x)
 
         # Squash samples and timesteps into a single axis
@@ -78,49 +75,60 @@ class GatedResidualNetwork(nn.Module):
     def __init__(self, input_size, hidden_state_size, output_size, dropout, hidden_context_size=None,
                  batch_first=False):
         super(GatedResidualNetwork, self).__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        self.hidden_context_size = hidden_context_size
-        self.hidden_state_size = hidden_state_size
-        self.dropout = dropout
+        # 初始化网络参数
+        self.input_size = input_size  # 输入大小
+        self.hidden_state_size = hidden_state_size  # 隐藏状态大小
+        self.output_size = output_size  # 输出大小
+        self.hidden_context_size = hidden_context_size  # 隐藏上下文大小
+        self.dropout = dropout  # dropout 比率
+        self.batch_first = batch_first  # 是否按批次优先
 
+        # 如果输入大小与输出大小不相等，则添加一个跳跃连接层
         if self.input_size != self.output_size:
             self.skip_layer = TimeDistributed(nn.Linear(self.input_size, self.output_size))
 
+        # 第一个全连接层，使用 TimeDistributed 将其应用到每个时间步上
         self.fc1 = TimeDistributed(nn.Linear(self.input_size, self.hidden_state_size), batch_first=batch_first)
-        self.elu1 = nn.ELU()
+        self.elu1 = nn.ELU()  # 第一个激活函数
 
+        # 如果有隐藏上下文，将其应用到第一个全连接层输出上
         if self.hidden_context_size is not None:
             self.context = TimeDistributed(nn.Linear(self.hidden_context_size, self.hidden_state_size),
                                            batch_first=batch_first)
 
+        # 第二个全连接层，使用 TimeDistributed 将其应用到每个时间步上
         self.fc2 = TimeDistributed(nn.Linear(self.hidden_state_size, self.output_size), batch_first=batch_first)
-        self.elu2 = nn.ELU()
+        self.elu2 = nn.ELU()  # 第二个激活函数
 
-        self.dropout = nn.Dropout(self.dropout)
-        self.bn = TimeDistributed(nn.BatchNorm1d(self.output_size), batch_first=batch_first)
-        self.gate = TimeDistributed(GLU(self.output_size), batch_first=batch_first)
+        self.dropout = nn.Dropout(self.dropout)  # dropout 层
+        self.bn = TimeDistributed(nn.BatchNorm1d(self.output_size), batch_first=batch_first)  # 批次规范化层
+        self.gate = TimeDistributed(GLU(self.output_size), batch_first=batch_first)  # 门控线性单元
 
     def forward(self, x, context=None):
+        # 前向传播函数，接收输入张量 x 和上下文张量 context（如果有）
 
+        # 计算残差连接
         if self.input_size != self.output_size:
             residual = self.skip_layer(x)
         else:
             residual = x
 
+        # 第一个全连接层
         x = self.fc1(x)
+        # 如果有上下文，将上下文应用到第一个全连接层输出上
         if context is not None:
             context = self.context(context)
             x = x + context
-        x = self.elu1(x)
+        x = self.elu1(x)  # 应用激活函数
 
+        # 第二个全连接层
         x = self.fc2(x)
-        x = self.dropout(x)
-        x = self.gate(x)
-        x = x + residual
-        x = self.bn(x)
+        x = self.dropout(x)  # 应用 dropout
+        x = self.gate(x)  # 应用门控线性单元
+        x = x + residual  # 添加残差连接
+        x = self.bn(x)  # 应用批次规范化
 
-        return x
+        return x  # 返回输出张量
 
 
 class PositionalEncoder(torch.nn.Module):
@@ -130,10 +138,8 @@ class PositionalEncoder(torch.nn.Module):
         pe = torch.zeros(max_seq_len, d_model)
         for pos in range(max_seq_len):
             for i in range(0, d_model, 2):
-                pe[pos, i] = \
-                    math.sin(pos / (10000 ** ((2 * i) / d_model)))
-                pe[pos, i + 1] = \
-                    math.cos(pos / (10000 ** ((2 * (i + 1)) / d_model)))
+                pe[pos, i] = math.sin(pos / (10000 ** ((2 * i) / d_model)))
+                pe[pos, i + 1] = math.cos(pos / (10000 ** ((2 * (i + 1)) / d_model)))
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
@@ -146,13 +152,14 @@ class PositionalEncoder(torch.nn.Module):
             return x
 
 
+# 通过选择重要的特征，减少不必要的噪声输入，以提高建模性能。
 class VariableSelectionNetwork(nn.Module):
     def __init__(self, input_size, num_inputs, hidden_size, dropout, context=None):
         super(VariableSelectionNetwork, self).__init__()
 
-        self.hidden_size = hidden_size
         self.input_size = input_size
         self.num_inputs = num_inputs
+        self.hidden_size = hidden_size
         self.dropout = dropout
         self.context = context
 
@@ -285,8 +292,8 @@ class TFT(nn.Module):
         return torch.zeros(self.lstm_layers, self.batch_size, self.hidden_size, device=self.device)
 
     def apply_embedding(self, x, static_embedding, apply_masking):
-        ###x should have dimensions (batch_size, timesteps, input_size)
-        ## Apply masking is used to mask variables that should not be accessed after the encoding steps
+        # x should have dimensions (batch_size, timesteps, input_size)
+        # Apply masking is used to mask variables that should not be accessed after the encoding steps
         # Time-varying real embeddings
         if apply_masking:
             time_varying_real_vectors = []
@@ -303,7 +310,7 @@ class TFT(nn.Module):
                 time_varying_real_vectors.append(emb)
             time_varying_real_embedding = torch.cat(time_varying_real_vectors, dim=2)
 
-        ##Time-varying categorical embeddings (ie hour)
+        # Time-varying categorical embeddings (ie hour)
         time_varying_categoical_vectors = []
         for i in range(self.time_varying_categoical_variables):
             emb = self.time_varying_embedding_layers[i](
@@ -311,12 +318,12 @@ class TFT(nn.Module):
             time_varying_categoical_vectors.append(emb)
         time_varying_categoical_embedding = torch.cat(time_varying_categoical_vectors, dim=2)
 
-        ##repeat static_embedding for all timesteps
+        # repeat static_embedding for all timesteps
         static_embedding = torch.cat(time_varying_categoical_embedding.size(1) * [static_embedding])
         static_embedding = static_embedding.view(time_varying_categoical_embedding.size(0),
                                                  time_varying_categoical_embedding.size(1), -1)
 
-        ##concatenate all embeddings
+        # concatenate all embeddings
         embeddings = torch.cat([static_embedding, time_varying_categoical_embedding, time_varying_real_embedding],
                                dim=2)
 
@@ -342,7 +349,7 @@ class TFT(nn.Module):
 
     def forward(self, x):
 
-        ##inputs should be in this order
+        # inputs should be in this order
         # static
         # time_varying_categorical
         # time_varying_real
@@ -353,7 +360,7 @@ class TFT(nn.Module):
             emb = self.static_embedding_layers[i](x['identifier'][:, 0, i].long().to(self.device))
             embedding_vectors.append(emb)
 
-        ##Embedding and variable selection
+        # Embedding and variable selection
         static_embedding = torch.cat(embedding_vectors, dim=1)
         embeddings_encoder = self.apply_embedding(x['inputs'][:, :self.encode_length, :].float().to(self.device),
                                                   static_embedding, apply_masking=False)
@@ -372,37 +379,37 @@ class TFT(nn.Module):
         embeddings_encoder = embeddings_encoder + pe[:self.encode_length, :, :]
         embeddings_decoder = embeddings_decoder + pe[self.encode_length:, :, :]
 
-        ##LSTM
+        # LSTM
         lstm_input = torch.cat([embeddings_encoder, embeddings_decoder], dim=0)
         encoder_output, hidden = self.encode(embeddings_encoder)
         decoder_output, _ = self.decode(embeddings_decoder, hidden)
         lstm_output = torch.cat([encoder_output, decoder_output], dim=0)
 
-        ##skip connection over lstm
+        # skip connection over lstm
         lstm_output = self.post_lstm_gate(lstm_output + lstm_input)
 
-        ##static enrichment
+        # static enrichment
         static_embedding = torch.cat(lstm_output.size(0) * [static_embedding]).view(lstm_output.size(0),
                                                                                     lstm_output.size(1), -1)
         attn_input = self.static_enrichment(lstm_output, static_embedding)
 
-        ##skip connection over lstm
+        # skip connection over lstm
         attn_input = self.post_lstm_norm(lstm_output)
 
         # attn_input = self.position_encoding(attn_input)
 
-        ##Attention
+        # Attention
         attn_output, attn_output_weights = self.multihead_attn(attn_input[self.encode_length:, :, :],
                                                                attn_input[:self.encode_length, :, :],
                                                                attn_input[:self.encode_length, :, :])
 
-        ##skip connection over attention
+        # skip connection over attention
         attn_output = self.post_attn_gate(attn_output) + attn_input[self.encode_length:, :, :]
         attn_output = self.post_attn_norm(attn_output)
 
         output = self.pos_wise_ff(attn_output)  # [self.encode_length:,:,:])
 
-        ##skip connection over Decoder
+        # skip connection over Decoder
         output = self.pre_output_gate(output) + lstm_output[self.encode_length:, :, :]
 
         # Final output layers
@@ -410,5 +417,3 @@ class TFT(nn.Module):
         output = self.output_layer(output.view(self.batch_size, -1, self.hidden_size))
 
         return output, encoder_output, decoder_output, attn_output, attn_output_weights, encoder_sparse_weights, decoder_sparse_weights
-
-

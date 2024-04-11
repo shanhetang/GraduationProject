@@ -72,9 +72,8 @@ argparser.add_argument('-p', action="store_true", default=False, help='omit p hi
 argparser.add_argument('-t', action="store_true", default=False, help='omit t history features')
 argparser.add_argument('-test', action="store_true", default=False, help='test my_model')
 argparser.add_argument('-train', action="store_true", default=False, help='train my_model')
-argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2,Transformer")  # 训练方法
+argparser.add_argument('-m', action="store", dest="method", default='GRU', help="LSTM, HLR, LR, SM2")  # 训练方法
 argparser.add_argument('-hidden', action="store", dest="h", default='2', help="4, 8, 16, 32")  # 隐藏层数量
-argparser.add_argument('-hidden_dim', action="store", dest="hd", default='16', help="512, 1024")  # 隐藏层数量
 argparser.add_argument('-loss', action="store", dest="loss", default='sMAPE', help="MAPE, L1, MSE, sMAPE")  # 损失函数
 argparser.add_argument('input_file', action="store", help='log file for training')
 
@@ -89,7 +88,6 @@ if __name__ == "__main__":
     if args.t:
         sys.stderr.write('--> omit_t_history\n')
     sys.stderr.write(f'{args.h} --> n_hidden\n')
-    sys.stderr.write(f'{args.hd} --> n_hidden_dim\n')
     sys.stderr.write(f'{args.loss} --> loss\n')
 
     # 读取数据 拆分训练集和测试集
@@ -107,31 +105,23 @@ if __name__ == "__main__":
             sys.stderr.write('|train| = %d\n' % len(train_train))
             sys.stderr.write('|test|  = %d\n' % len(train_test))
             if args.method in rnn_algo:
-                from my_model.RNN_HLR import SpacedRepetitionModel
+                from model.RNN_HLR import SpacedRepetitionModel
 
                 model = SpacedRepetitionModel(train_train, train_test, omit_p_history=args.p, omit_t_history=args.t,
                                               hidden_nums=int(args.h), loss=args.loss, network=args.method)
                 model.train()
                 model.eval(0, 0)
             elif args.method in duolingo_algo:
-                from my_model.halflife_regression import SpacedRepetitionModel
+                from model.halflife_regression import SpacedRepetitionModel
 
                 train_fold, test_fold = feature_extract(train_train, train_test, args.method, args.l)
                 model = SpacedRepetitionModel(train_fold, test_fold, method=args.method,omit_lexemes= args.l)
                 model.train()
                 model.eval(0, 0)
             elif args.method == 'DHP':
-                from my_model.DHP import SpacedRepetitionModel
+                from model.DHP import SpacedRepetitionModel
 
                 model = SpacedRepetitionModel(train_train, train_test)
-                model.train()
-                model.eval(0, 0)
-            # TODO
-            elif args.method == 'Transformer':
-                from my_model.Transformer_HLR2 import SpacedRepetitionModel
-                print("Transformer_HLR2")
-                model = SpacedRepetitionModel(train_train, train_test, omit_p_history=args.p, omit_t_history=args.t,
-                                              hidden_dim=int(args.hd), loss=args.loss, network=args.method)
                 model.train()
                 model.eval(0, 0)
         else:  # -test
@@ -147,36 +137,27 @@ if __name__ == "__main__":
                 sys.stderr.write(f'|train| = {len(train_index)}\n')
                 sys.stderr.write(f'|test|  = {len(test_fold)}\n')
                 if args.method in rnn_algo:
-                    from my_model.RNN_HLR import SpacedRepetitionModel
+                    from model.RNN_HLR import SpacedRepetitionModel
 
                     model = SpacedRepetitionModel(train_fold, test_fold, omit_p_history=args.p, omit_t_history=args.t,
                                                   hidden_nums=int(args.h), loss=args.loss, network=args.method)
                     model.train()
                     model.eval(repeat, fold)
                 elif args.method in duolingo_algo:
-                    from my_model.halflife_regression import SpacedRepetitionModel
+                    from model.halflife_regression import SpacedRepetitionModel
 
                     train_fold, test_fold = feature_extract(train_fold, test_fold, args.method, args.l)
                     model = SpacedRepetitionModel(train_fold, test_fold, method=args.method, omit_lexemes=args.l)
                     model.train()
                     model.eval(repeat, fold)
                 elif args.method == 'SM2':
-                    from my_model.SM2 import eval
+                    from model.SM2 import eval
 
                     eval(test_fold, repeat, fold)
                 elif args.method == 'DHP':
-                    from my_model.DHP import SpacedRepetitionModel
+                    from model.DHP import SpacedRepetitionModel
 
                     model = SpacedRepetitionModel(train_fold, test_fold)
-                    model.train()
-                    model.eval(repeat, fold)
-                # TODO
-                elif args.method == 'Transformer':
-                    from my_model.Transformer_HLR2 import SpacedRepetitionModel
-
-                    model = SpacedRepetitionModel(train_fold, test_fold, omit_p_history=args.p, omit_t_history=args.t,
-                                                  hidden_dim=int(args.hd), loss=args.loss, network=args.method)
-
                     model.train()
                     model.eval(repeat, fold)
                 else:
@@ -193,26 +174,19 @@ if __name__ == "__main__":
         # train_train, train_test = train_test_split(dataset, test_size=0.2, random_state=2022)
         sys.stderr.write('|train| = %d\n' % len(dataset))
         if args.method in rnn_algo:
-            from my_model.RNN_HLR import SpacedRepetitionModel
+            from model.RNN_HLR import SpacedRepetitionModel
 
             model = SpacedRepetitionModel(dataset, dataset, omit_p_history=args.p, omit_t_history=args.t,
                                           hidden_nums=int(args.h), loss=args.loss, network=args.method)
             model.train()
         elif args.method in duolingo_algo:
-            from my_model.halflife_regression import SpacedRepetitionModel
+            from model.halflife_regression import SpacedRepetitionModel
 
             train_fold, test_fold = feature_extract(dataset, dataset, args.method, args.l)
             model = SpacedRepetitionModel(train_fold, test_fold, method=args.method, omit_lexemes=args.l)
             model.train()
         elif args.method == 'DHP':
-            from my_model.DHP import SpacedRepetitionModel
+            from model.DHP import SpacedRepetitionModel
 
             model = SpacedRepetitionModel(dataset, dataset)
-            model.train()
-        # TODO
-        elif args.method == 'Transformer':
-            from my_model.Transformer_HLR2 import SpacedRepetitionModel
-
-            model = SpacedRepetitionModel(dataset,dataset,omit_p_history=args.p, omit_t_history=args.t,
-                                          hidden_dim=int(args.hd), loss=args.loss, network=args.method)
             model.train()
