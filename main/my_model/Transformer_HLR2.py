@@ -1,12 +1,13 @@
-# 第一个成功的模型：
-# 模型首先通过卷积层进行特征降维以及
+'''
+最终确定的第一版Transformer模型，模型的架构为因果卷积、位置编码（包含传统的硬编码和可学习编码）以及Transformer编码器
+'''
 
 import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim.lr_scheduler
 import numpy as np
-import torch.nn.functional
+import torch.nn.functional as F
 import time
 import math
 from pathlib import Path
@@ -23,34 +24,57 @@ def time_since(since):
     return '%dm %ds' % (m, s)
 
 
+# l1_loss:平均绝对误差MAE
 def l1_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual)
+    return F.l1_loss(forecast, actual)
 
 
 def mse_loss(forecast, actual):
-    return nn.functional.mse_loss(forecast, actual)
+    return F.mse_loss(forecast, actual)
 
 
 def mape_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual) / abs(actual)
+    return F.l1_loss(forecast, actual) / abs(actual)
 
 
 def smape_loss(forecast, actual):
-    return nn.functional.l1_loss(forecast, actual) / (abs(forecast) + abs(actual)) * 2
+    return F.l1_loss(forecast, actual) / (abs(forecast) + abs(actual)) * 2
 
 
-input_window = 100
-output_window = 5
-batch_size = 10  # batch size
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+class CausalConv1d(nn.Conv1d):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 stride=1, ):
+        super(CausalConv1d, self).__init__(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=0, )
+
+        self.__padding = kernel_size - 1
+
+    def forward(self, x):
+        """
+        Inputs of forward function
+        Shape:
+            x: [batch size, sequence length, feat_dim]
+            output: [batch size, sequence length, feat_dim]
+        """
+        x = x.permute(0, 2, 1)
+        x = super(CausalConv1d, self).forward(F.pad(x, (self.__padding, 0)))
+        return x.permute(0, 2, 1)
 
 
-# TODO
-# 这里返回的是[batch_size,len,feature_dim]
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
 
-    def __init__(self, d_model, dropout, max_len=5000):
+    def __init__(self,
+                 d_model,
+                 dropout,
+                 max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -81,25 +105,64 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class TransformerModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_heads, encode_layers_num, output_dim=1, dropout=0.1):
+class LearnablePositionalEncoding(nn.Module):
+    def __init__(self,
+                 d_model,
+                 dropout=0.1,
+                 max_len=5000):
+        super(LearnablePositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        # Each position gets its own embedding
+        # Since indices are always 0 ... max_len, we don't have to do a look-up
+        self.pe = nn.Parameter(torch.empty(max_len, 1, d_model))  # requires_grad automatically set to True
+        nn.init.uniform_(self.pe, -0.02, 0.02)
+
+    def forward(self, x):
+        r"""Inputs of forward function
+        Args:
+            x: the sequence fed to the positional encoder model (required).
+        Shape:
+            x: [batch size, sequence length, embed dim]
+            output: [batch size, sequence length, embed dim]
         """
-        初始化
+        x = x.permute(1, 0, 2)
+        x = x + self.pe[:x.size(0), :]
+        x = self.dropout(x)
+        return x.permute(1, 0, 2)
+
+
+class TransformerModel(nn.Module):
+    def __init__(self,
+                 input_dim,
+                 d_model,
+                 num_heads,
+                 encode_layers_num,
+                 output_dim=1,
+                 dropout=0.1,
+                 kernel_size=3,
+                 pos='traditional'):
+        """
         :param input_dim: 输入的特征数量
-        :param hidden_dim: 时间步嵌入
+        :param d_model: 时间步嵌入
         :param output_dim: 输出的维度
         """
         super(TransformerModel, self).__init__()
-        # 卷积层
-        self.conv = nn.Conv1d(in_channels=input_dim, out_channels=hidden_dim, kernel_size=3, stride=1, padding=1)
+        # 因果卷积层
+        self.conv = CausalConv1d(in_channels=input_dim, out_channels=d_model, kernel_size=kernel_size)
+
         # 定义位置编码器
-        self.positional_encoding = PositionalEncoding(hidden_dim, dropout=0.0)
-        # Transformer模型
-        self.encode_layer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=num_heads, dropout=dropout,
+        if pos == 'learnable':
+            self.positional_encoding = LearnablePositionalEncoding(d_model, dropout=dropout)
+        elif pos == 'traditional':
+            self.positional_encoding = PositionalEncoding(d_model, dropout=dropout)
+
+        # Transformer encoder
+        self.encode_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, dropout=dropout,
                                                        batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.encode_layer, num_layers=encode_layers_num)
-        # 映射到输出维度
-        self.decoder = nn.Linear(hidden_dim, output_dim)
+
+        # decoder 映射到输出维度
+        self.decoder = nn.Linear(d_model, output_dim)
         self.init_weights()
 
     def init_weights(self):
@@ -108,24 +171,36 @@ class TransformerModel(nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, sample_tensor):
-        tmp = torch.transpose(sample_tensor, 1, 2)
-        out_tmp = self.conv(tmp)
-        t_src = torch.transpose(out_tmp, 1, 2)
+        """
+        shape
+         sample_tensor: [batch size, sequence length, feat_dim]
+            output: [batch size, sequence length,  output_dim]
+        """
+        t_src = self.conv(sample_tensor)
 
-        # 给src和tgt的token增加位置信息
         t_src = self.positional_encoding(t_src)
 
         t_output = self.transformer_encoder(src=t_src)
 
-        output = self.decoder(t_output)
-        # print(output.shape)
+        output = torch.exp(self.decoder(t_output))
         return output
 
 
 class SpacedRepetitionModel(object):
-    def __init__(self, train_set, test_set, omit_p_history=False, omit_t_history=False, hidden_dim=256, loss="sMAPE",
-                 network="TransformerModel"):
-        self.n_hidden = hidden_dim  # 编码器解码器特征数量
+    def __init__(self,
+                 train_set,
+                 test_set,
+                 n_heads,
+                 d_model=256,
+                 num_layers=2,
+                 kernel_size=3,
+                 omit_p_history=False,
+                 omit_t_history=False,
+                 loss="sMAPE",
+                 network="Transformer"):
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设置GPU加速
+        print('device:', self.device)
+
         self.omit_p = omit_p_history  # 是否省略p_history
         self.omit_t = omit_t_history  # 是否省略t_history
         if omit_p_history and omit_t_history:
@@ -135,13 +210,26 @@ class SpacedRepetitionModel(object):
         else:
             self.feature_num = 3
 
-        self.net_name = network  # 使用的网络
-
         # 模型初始化
-        num_heads = 4  # 多头自注意力机制的头数
-        num_layers = 2  # Transformer层数
+        self.net_name = network  # 使用的网络
+        self.d_model = d_model  # 编码器解码器特征数量
+        self.num_heads = n_heads  # 多头自注意力机制的头数
+        self.num_layers = num_layers  # Transformer encoder层数
+        self.kernel_size = kernel_size  # 卷积的核数
+        self.net = TransformerModel(self.feature_num, self.d_model, self.num_heads,
+                                    self.num_layers, kernel_size=self.kernel_size).to(self.device)
 
-        self.net = TransformerModel(self.feature_num, self.n_hidden, num_heads, num_layers)
+        # 损失函数
+        self.loss_name = loss
+        if loss == "MAPE":
+            self.loss = mape_loss
+        elif loss == "L1":
+            self.loss = l1_loss
+        elif loss == "MSE":
+            self.loss = mse_loss
+        elif loss == "sMAPE":
+            self.loss = smape_loss
+
         self.lr = 1e-5  # 学习率
         self.weight_decay = 1e-3  # 权重衰减 正则化
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)  # Adam优化器
@@ -153,26 +241,20 @@ class SpacedRepetitionModel(object):
         self.train_set = train_set
         self.test_set = test_set
         self.train_cnt = len(train_set)
-        # TODO
-        self.n_iter = 1000
+
+        self.n_iter = 1000000
         self.n_epoch = int(self.n_iter / self.train_cnt + 1)  # 定义迭代次数
         print(f"Epoch num: {self.n_epoch}")
         self.print_every = int(self.train_cnt / 4)  # 每一个epoch汇报4次进度
         self.plot_every = self.train_cnt  # 每一个epoch汇报1次进度
 
-        self.loss_name = loss  # 损失函数
-        if loss == "MAPE":
-            self.loss = mape_loss
-        elif loss == "L1":
-            self.loss = l1_loss
-        elif loss == "MSE":
-            self.loss = mse_loss
-        elif loss == "sMAPE":
-            self.loss = smape_loss
-        self.writer = SummaryWriter(comment=self.write_title())  # SummaryWriter 是 PyTorch 提供的用于将信息写入 TensorBoard 的工具
+        # SummaryWriter是PyTorch提供的用于将信息写入TensorBoard的工具
+        self.writer = SummaryWriter(comment=self.write_title())
 
     def write_title(self):
-        title = f'nn-{self.net_name}_nh-{self.n_hidden}_loss-{self.loss_name}'
+        title = f'exp-{self.net_name}-d_model={self.d_model}-nhead={self.num_heads}-encoder_num={self.num_layers}'
+        if self.kernel_size != 3:
+            title += "-k=" + str(self.kernel_size)
         if self.omit_p:
             title += "-p"
         if self.omit_t:
@@ -185,12 +267,14 @@ class SpacedRepetitionModel(object):
             print(f"Epoch: {i + 1}")
             train_set = shuffle(self.train_set, random_state=i)
             for idx, index in enumerate(train_set.index):
-                # 半衰期、历史特征列表、半衰期张量、历史记录张量
-                halflife, line, halflife_tensor, line_tensor = self.sample2tensor(train_set.loc[index])
                 self.net.train()
                 self.optimizer.zero_grad()  # 梯度清为0
+                # 半衰期、历史特征列表、半衰期张量、历史记录张量
+                halflife, line, halflife_tensor, line_tensor = self.sample2tensor(train_set.loc[index])
+                line_tensor = line_tensor.to(device=self.device)
+                halflife_tensor = halflife_tensor.to(device=self.device)
                 output = self.net(line_tensor)
-                loss = self.loss(output[:,-1,0], halflife_tensor)
+                loss = self.loss(output[:, -1, 0], halflife_tensor)
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
@@ -198,11 +282,12 @@ class SpacedRepetitionModel(object):
                 iterations = idx + i * self.train_cnt + 1
 
                 if iterations % self.print_every == 0:
-                    guess = output.detach().numpy()
+                    tmp = output.cpu()
+                    guess = tmp.detach().numpy()
                     correct = halflife_tensor[0]
                     print('%d %d%% (%s) %.4f %.4f %.4f / %s' % (
                         iterations, iterations / (self.n_epoch * self.train_cnt) * 100, time_since(start),
-                        loss.data.item(), guess[:,-1,:], correct,
+                        loss.data.item(), guess[:, -1, :], correct,
                         line))
 
                 if iterations % self.plot_every == 0:
@@ -218,8 +303,10 @@ class SpacedRepetitionModel(object):
                             for plot_index in dataset.index:
                                 halflife, line, halflife_tensor, line_tensor = self.sample2tensor(
                                     dataset.loc[plot_index])
+                                line_tensor = line_tensor.to(device=self.device)
+                                halflife_tensor = halflife_tensor.to(device=self.device)
                                 output = self.net(line_tensor)
-                                loss = self.loss(output[:,-1,0], halflife_tensor)
+                                loss = self.loss(output[:, -1, 0], halflife_tensor)
                                 plot_loss += loss.data.item()
                                 plot_count += 1
                         if stage == 'train':
@@ -241,10 +328,6 @@ class SpacedRepetitionModel(object):
         path = f'./tmp/{title}'
         Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(self.net, f'{path}/model.pth')
-        example_input = torch.rand(1, 10, self.feature_num)
-        fully_traced = torch.jit.trace_module(self.net, {'forward': example_input})
-        fully_traced.save(f'{path}/model.pt')
-        self.writer.add_graph(self.net, example_input)
         self.writer.close()
 
     def eval(self, repeat, fold):
@@ -259,8 +342,12 @@ class SpacedRepetitionModel(object):
             for index in tqdm(self.test_set.index):
                 sample = self.test_set.loc[index]
                 halflife, line, halflife_tensor, line_tensor = self.sample2tensor(sample)
+                line_tensor = line_tensor.to(device=self.device)
+                halflife_tensor = halflife_tensor.to(device=self.device)
                 output = self.net(line_tensor)
-                output = float(output[:,-1,0])
+                output = output.cpu()
+                output = float(output[:, -1, 0])
+
                 pp = np.exp(np.log(0.5) * sample['delta_t'] / output)
                 p = sample['p_recall']
                 ae += abs(p - pp)
@@ -308,4 +395,4 @@ class SpacedRepetitionModel(object):
                 sample_tensor[0][li][2] = float(p_history[li])
 
         # 返回半衰期、历史特征列表、半衰期张量、历史记录张量
-        return halflife, features, halflife_tensor, sample_tensor
+        return halflife, features, halflife_tensor, sample_tensor,

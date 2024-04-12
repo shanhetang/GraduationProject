@@ -11,7 +11,11 @@ def halflife_forgetting_curve(x, h):
 
 def cal_halflife(group):
     if group['i'].values[0] > 1:
-        r_ivl_cnt = sum(group['delta_t'] * group['p_recall'].map(np.log) * group['total_cnt'])
+        r_ivl_cnt = sum(
+            group['delta_t']  # Δt
+            * group['p_recall'].map(np.log)  # log_2(p)
+            * group['total_cnt']  #
+        )
         ivl_ivl_cnt = sum(group['delta_t'].map(lambda x: x ** 2) * group['total_cnt'])
         group['halflife'] = round(np.log(0.5) / (r_ivl_cnt / ivl_ivl_cnt), 4)
     else:

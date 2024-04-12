@@ -7,17 +7,59 @@ import plotly.express as px
 import plotly.graph_objects as go
 import tqdm
 
-from my_model.utils import *
+from model.utils import *
 from envrioment import DHP_HLR, GRU_HLR
 
 # plt.style.use('whitegrid')
-plt.rc('text', usetex=True)
+plt.rc('text', usetex=False)
 plt.rc('font', family='serif')
 camera = dict(
     up=dict(x=0, y=0, z=1),
     center=dict(x=0, y=0, z=0),
     eye=dict(x=1.5, y=1.5, z=1.25)
 )
+plt.rcParams["font.family"]="SimHei"
+
+
+def difficulty_visualize1():
+    # 读取数据集
+    raw = pd.read_csv('../data/opensource_dataset_difficulty.tsv', sep='\t')
+    u = raw['p_recall'].mean() # 计算召回概率的均值和标准差
+    std = raw['p_recall'].std()
+    print(u, std)
+
+    plt.figure(figsize=(10, 6))    # 绘制召回概率的直方图
+    ax = plt.subplot(111)
+    ax.hist(raw['p_recall'], bins=20, color='skyblue', edgecolor='black', density=False, align='mid')
+    ax.set_xlabel('回忆概率（p）\n\n (a)', fontsize=28)
+    ax.set_ylabel('频数', fontsize=28)
+    ax.tick_params(axis='both', labelsize=22)
+    ax.set_xlim(0.15, 1)
+    ax.spines[['top','right']].set_visible(False) # 不显示上方和右方的坐标轴框线
+    ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    ax.set_axisbelow(True)  # 网格显现在图形下方
+    plt.tight_layout()
+    plt.savefig("plot/回忆概率分布.png")
+    plt.show()
+
+    # 绘制难度的直方图
+    plt.figure(figsize=(10, 6))
+    ax = plt.subplot(111)
+    # 设置背景颜色
+    # ax.set_facecolor('#FFFFF0')
+    ax.hist(raw['d'], color='skyblue', edgecolor='black', density=False, align='left')
+    ax.set_xlabel('难度\n\n (b)', fontsize=28)
+    ax.set_ylabel('频数', fontsize=28)
+    ax.tick_params(axis='x', labelsize=22)
+    ax.tick_params(axis='y', labelsize=22)
+    ax.spines[['top','right']].set_visible(False)
+    ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    ax.set_axisbelow(True)  # 网格显现在图形下方
+
+    plt.tight_layout()
+    plt.savefig("plot/难度分布.png")
+    plt.show()
+
 
 
 def difficulty_visualize():
@@ -25,23 +67,23 @@ def difficulty_visualize():
     u = raw['p_recall'].mean()
     std = raw['p_recall'].std()
     print(u, std)
+
     fig = px.histogram(raw, x="p_recall", nbins=20)
-    fig.update_xaxes(title_text='probability of P(recall)', title_font=dict(size=26), tickfont=dict(size=22),
+    fig.update_xaxes(title_text='回忆概率P', title_font=dict(size=26), tickfont=dict(size=22),
                      range=[0.15, 1])
-    fig.update_yaxes(title_font=dict(size=26), tickfont=dict(size=22))
+    fig.update_yaxes(title_text='数量',title_font=dict(size=26), tickfont=dict(size=22))
     fig.update_layout(bargap=0.2, margin_t=10, margin_r=10, margin_b=10)
+    fig.write_image("plot/distribution_p.png", width=600, height=360)
     # fig.show()
-    fig.write_image("plot/distribution_p.pdf", width=600, height=360)
     time.sleep(3)
-    fig.write_image("plot/distribution_p.pdf", width=600, height=360)
-    fig = px.histogram(raw, x="d", text_auto=True)
-    fig.update_xaxes(title_text='difficulty', title_font=dict(size=26), tickfont=dict(size=22))
-    fig.update_yaxes(title_font=dict(size=26), tickfont=dict(size=22))
+
+    fig = px.histogram(raw, x="d", text_auto=False)
+    fig.update_xaxes(title_text='难度', title_font=dict(size=26), tickfont=dict(size=22))
+    fig.update_yaxes(title_text='数量',title_font=dict(size=26), tickfont=dict(size=22))
     fig.update_layout(bargap=0.2, margin_t=10, margin_r=10, margin_b=10)
+    fig.write_image("plot/distribution_d.png", width=600, height=360)
     # fig.show()
-    fig.write_image("plot/distribution_d.pdf", width=600, height=360)
     time.sleep(3)
-    fig.write_image("plot/distribution_d.pdf", width=600, height=360)
 
 
 def forgetting_curve_visualize():
@@ -315,10 +357,10 @@ def gru_model_visualize():
 
 
 if __name__ == "__main__":
-    difficulty_visualize()
-    forgetting_curve_visualize()
-    raw_data_visualize()
-    dhp_model_visualize()
-    gru_model_visualize()
+    difficulty_visualize1()
+    # forgetting_curve_visualize()
+    # raw_data_visualize()
+    # dhp_model_visualize()
+    # gru_model_visualize()
     # dhp_policy_action_visualize()
     # gru_policy_action_visualize()

@@ -37,11 +37,15 @@ def time_since(since):
 
 
 class RNN(nn.Module):
-    def __init__(self, n_letters, n_hidden, n_output, network):
+    def __init__(self, n_letters, n_hidden, n_categories, network, attention_flag = True):
         super().__init__()
         self.n_input = n_letters
         self.n_hidden = n_hidden
-        self.n_out = n_output
+        self.n_out = n_categories
+        self.attention_flag = attention_flag
+        if attention_flag:
+            self.attention = nn.MultiheadAttention(embed_dim=self.n_hidden, num_heads=1)
+
         if network == 'GRU':
             self.rnn = nn.GRU(self.n_input, self.n_hidden, 1)
         elif network == "LSTM":
@@ -51,7 +55,12 @@ class RNN(nn.Module):
         self.fc = nn.Linear(self.n_hidden, self.n_out)
 
     def forward(self, x, hx):
-        x, h = self.rnn(x, hx=hx)
+        if self.attention_flag:
+            x, h = self.rnn(x, hx=hx)
+            attention_output, _ = self.attention(x, x, x)  # 注意力机制
+            x = x + attention_output
+        else:
+            x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x[-1]))
         return output, h
 
@@ -62,7 +71,9 @@ class RNN(nn.Module):
 class SpacedRepetitionModel(object):
     def __init__(self, train_set, test_set, omit_p_history=False, omit_t_history=False, hidden_nums=16, loss="MAPE",
                  network="GRU"):
-
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设置GPU加速
+        print('device:', self.device)
+        self.attention_flag = False
         self.n_hidden = hidden_nums  # 隐藏层数量
         self.omit_p = omit_p_history  # 是否省略p_history
         self.omit_t = omit_t_history  # 是否省略t_history
@@ -73,7 +84,7 @@ class SpacedRepetitionModel(object):
         else:
             self.feature_num = 3
         self.net_name = network  # 使用的网络
-        self.net = RNN(self.feature_num, self.n_hidden, 1, network)
+        self.net = RNN(self.feature_num, self.n_hidden, 1, network, self.attention_flag).to(device=self.device)
         self.lr = 1e-3  # 学习率
         self.weight_decay = 1e-5  # 权重衰减 正则化
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)  # Adam优化器
@@ -89,7 +100,6 @@ class SpacedRepetitionModel(object):
         self.n_epoch = int(self.n_iter / self.train_cnt + 1)  # 定义迭代次数
         self.print_every = int(self.train_cnt / 4)  # 每一个epoch汇报4次进度
         self.plot_every = self.train_cnt  # 每一个epoch汇报1次进度
-
         self.loss_name = loss  # 损失函数
         if loss == "MAPE":
             self.loss = mape_loss
@@ -108,6 +118,8 @@ class SpacedRepetitionModel(object):
             title += "-p"
         if self.omit_t:
             title += "-t"
+        if self.attention_flag:
+            title += "-atten"
         return title
 
     def train(self):
@@ -118,7 +130,9 @@ class SpacedRepetitionModel(object):
             for idx, index in enumerate(train_set.index):
                 # 半衰期、历史特征列表、半衰期张量、历史记录张量、样本的权重标准化信息
                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(train_set.loc[index])
-                self.net.train() # 设置为训练模式
+                line_tensor = line_tensor.to(device=self.device)
+                halflife_tensor = halflife_tensor.to(device=self.device)
+                self.net.train()
                 self.optimizer.zero_grad()  # 梯度清为0
                 output, _ = self.net(line_tensor, None)
                 loss = self.loss(output[0], halflife_tensor) * weight
@@ -130,13 +144,14 @@ class SpacedRepetitionModel(object):
                 iterations = idx + i * self.train_cnt + 1
 
                 if iterations % self.print_every == 0:
-                    guess = output.detach().numpy()
+                    tmp = output.cpu()
+                    guess = tmp.detach().numpy()
+                    print(guess)
                     correct = halflife_tensor[0]
                     print(
                         '%d %d%% (%s) %.4f %.4f %.4f / %s' % (
                             iterations, iterations / (self.n_epoch * self.train_cnt) * 100, time_since(start),
-                            loss.data.item(), guess, correct,
-                            line))
+                            loss.data.item(), guess[-1], correct, line))
 
                 if iterations % self.plot_every == 0:
                     self.net.eval()
@@ -151,6 +166,8 @@ class SpacedRepetitionModel(object):
                             for plot_index in dataset.index:
                                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(
                                     dataset.loc[plot_index])
+                                line_tensor = line_tensor.to(device=self.device)
+                                halflife_tensor = halflife_tensor.to(device=self.device)
                                 output, _ = self.net(line_tensor, None)
                                 loss = self.loss(output[0], halflife_tensor) * weight
                                 plot_loss += loss.data.item()
@@ -168,36 +185,27 @@ class SpacedRepetitionModel(object):
             self.writer.add_scalar('train_loss', self.avg_train_losses[-1], i + 1)
             self.writer.add_scalar('eval_loss', self.avg_eval_losses[-1], i + 1)
 
-        # plt.figure()
-        # plt.plot(self.avg_train_losses, label='train')
-        # plt.plot(self.avg_eval_losses, label='eval')
         title = self.write_title()
-        # plt.title(f'{title}_lr:{self.lr}_wd:{self.weight_decay}')
-        # plt.ylabel('Average loss')
-        # plt.legend()
-        # plt.grid()
-        # plt.show()
-        self.net.eval() # eval模式
+        self.net.eval()
         # 保存模型
         path = f'./tmp/{title}'
         Path(path).mkdir(parents=True, exist_ok=True)
         torch.save(self.net, f'{path}/model.pth')
-        example_input = torch.rand(1, 1, self.feature_num)
-        if self.net_name == "LSTM":
-            example_hidden = (torch.randn(1, 1, self.n_hidden), torch.randn(1, 1, self.n_hidden))
-            fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden)})
-        else:
-            example_hidden = torch.rand(1, 1, self.n_hidden)
-            fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden),
-                                                             'full_connect': example_hidden})
-        fully_traced.save(f'{path}/model.pt')
-        self.writer.add_graph(self.net, [example_input, example_hidden])
+        # example_input = torch.rand(1, 1, self.feature_num)
+        # if self.net_name == "LSTM":
+        #     example_hidden = (torch.randn(1, 1, self.n_hidden), torch.randn(1, 1, self.n_hidden))
+        #     fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden)})
+        # else:
+        #     example_hidden = torch.rand(1, 1, self.n_hidden)
+        #     fully_traced = torch.jit.trace_module(self.net, {'forward': (example_input, example_hidden),
+        #                                                  'full_connect': example_hidden})
+        # fully_traced.save(f'{path}/model.pt')
+        # self.writer.add_graph(self.net, [example_input, example_hidden])
         self.writer.close()
 
     def eval(self, repeat, fold):
         record = pd.DataFrame(
-            columns=['r_history', 't_history', 'p_history',
-                     't','halflife', 'hh', 'p', 'pp', 'ae', 'ape'])
+            columns=['r_history', 't_history', 'p_history','t','halflife', 'hh', 'p', 'pp', 'ae', 'ape'])
         self.net.eval()
         with torch.no_grad():
             ae = 0
@@ -206,6 +214,8 @@ class SpacedRepetitionModel(object):
             for index in tqdm(self.test_set.index):
                 sample = self.test_set.loc[index]
                 halflife, line, halflife_tensor, line_tensor, weight = self.sample2tensor(sample)
+                line_tensor = line_tensor.to(device=self.device)
+                halflife_tensor = halflife_tensor.to(device=self.device)
                 output = self.net(line_tensor, None)
                 output = float(output[0])
                 pp = np.exp(np.log(0.5) * sample['delta_t'] / output)
