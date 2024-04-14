@@ -28,38 +28,39 @@ def difficulty_visualize1():
     std = raw['p_recall'].std()
     print(u, std)
 
-    plt.figure(figsize=(10, 6))    # 绘制召回概率的直方图
-    ax = plt.subplot(111)
-    ax.hist(raw['p_recall'], bins=20, color='skyblue', edgecolor='black', density=False, align='mid')
-    ax.set_xlabel('回忆概率（p）\n\n (a)', fontsize=28)
+    plt.figure(figsize=(20, 6))    # 绘制召回概率的直方图
+    ax = plt.subplot(121)
+    ax.hist(raw['p_recall'], bins=[0.15,0.2, 0.25, 0.3, 0.35,0.4, 0.45, 0.5,0.55, 0.6,0.65,0.7,0.75, 0.8,0.85,0.9, 0.95, 1.0], color='skyblue', edgecolor='black', density=False, align='mid')
+    ax.set_xlabel('回忆概率（p）\n\n(a)', fontsize=28)
     ax.set_ylabel('频数', fontsize=28)
     ax.tick_params(axis='both', labelsize=22)
     ax.set_xlim(0.15, 1)
     ax.spines[['top','right']].set_visible(False) # 不显示上方和右方的坐标轴框线
     ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
     ax.set_axisbelow(True)  # 网格显现在图形下方
-    plt.tight_layout()
-    plt.savefig("plot/回忆概率分布.png")
-    plt.show()
+    # plt.tight_layout()
+    # plt.savefig("plot/回忆概率分布.png")
+    # plt.show()
 
     # 绘制难度的直方图
-    plt.figure(figsize=(10, 6))
-    ax = plt.subplot(111)
+    # plt.figure(figsize=(20, 6))
+    ax = plt.subplot(122)
     # 设置背景颜色
     # ax.set_facecolor('#FFFFF0')
-    ax.hist(raw['d'], color='skyblue', edgecolor='black', density=False, align='left')
-    ax.set_xlabel('难度\n\n (b)', fontsize=28)
+    ax.hist(raw['d'], bins=[0.5, 1.5, 2.5,3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], color='skyblue', edgecolor='black', linewidth=2)
+    ax.set_xlabel('难度\n\n(b)', fontsize=28)
     ax.set_ylabel('频数', fontsize=28)
+    ax.set_xlim(0.5, 11)
+    ax.set_xticks(range(1,11))
     ax.tick_params(axis='x', labelsize=22)
     ax.tick_params(axis='y', labelsize=22)
     ax.spines[['top','right']].set_visible(False)
     ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
-    ax.set_axisbelow(True)  # 网格显现在图形下方
+    ax.set_axisbelow(False)  # 网格显现在图形下方
 
     plt.tight_layout()
-    plt.savefig("plot/难度分布.png")
+    plt.savefig("plot/图一.png")
     plt.show()
-
 
 
 def difficulty_visualize():
@@ -88,41 +89,40 @@ def difficulty_visualize():
 
 def forgetting_curve_visualize():
     raw = pd.read_csv('../data/opensource_dataset_p_history.tsv', sep='\t')
-    filters = [(4, '0,1', '0,1'), (4, '0,1,1', '0,1,3'), (4, '0,1,1', '0,1,4'), (4, '0,1,1', '0,1,5')]
+    # filters = [(3, '0,1', '0,1'), (3, '0,1,1', '0,1,3'), (3, '0,1,1', '0,1,4'), (3, '0,1,1', '0,1,5')]
+    # filters = [(3, '0,1,1', '0,1,3')]
     fig = go.Figure()
     color = ['blue', 'red', 'green', 'orange']
     for i, f in enumerate(filters):
+        print(i)
         d = f[0]
         r_history = f[1]
         t_history = f[2]
         tmp = raw[(raw['d'] == d) & (raw['r_history'] == r_history) & (raw['t_history'] == t_history)].copy()
         tmp.sort_values(by=['delta_t'], inplace=True)
-        tmp['size'] = np.log(tmp['total_cnt'])
+        tmp['size'] = np.log(tmp['total_cnt']) #标点大小
         halflife = tmp['halflife'].values[0]
-        tmp['fit_p_recall'] = np.power(2, -tmp['delta_t'] / halflife)
+        tmp['fit_p_recall'] = np.power(2, -tmp['delta_t'] / halflife)  # 计算回忆概率
         fig.add_trace(
             go.Scatter(x=tmp['delta_t'], y=tmp['fit_p_recall'], mode='lines', name=f'halflife={halflife:.2f}'))
-        fig.add_trace(go.Scatter(x=tmp['delta_t'], y=tmp['p_recall'],
-                                 mode='markers', marker_size=tmp['size'],
-                                 name=r'$d=%d|\boldsymbol r_{1:i-1}=%s|\boldsymbol{\Delta t}_{1:i-1}=%s$' % (
-                                     d, r_history, t_history)))
+        fig.add_trace(
+            go.Scatter(x=tmp['delta_t'], y=tmp['p_recall'],mode='markers', marker_size=tmp['size'],
+                                 name = f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
         fig.update_traces(marker_color=color[i], selector=dict(name=f'halflife={halflife:.2f}'))
         fig.update_traces(marker_color=color[i],
-                          selector=dict(name=r'$d=%d|\boldsymbol r_{1:i-1}=%s|\boldsymbol{\Delta t}_{1:i-1}=%s$' % (
-                              d, r_history, t_history)))
+                          selector=dict(name = f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
     fig.update_layout(legend=dict(
         yanchor="bottom",
         y=0.01,
         xanchor="right",
         x=0.99
     ))
+    fig.update_layout(yaxis=dict(range=[0.1, 1]))
     fig.update_xaxes(title_text='delta_t', title_font=dict(size=18), tickfont=dict(size=14))
     fig.update_yaxes(title_text='p_recall', title_font=dict(size=18), tickfont=dict(size=14))
     fig.update_layout(margin_t=10, margin_r=10, margin_b=10)
     # fig.show()
-    fig.write_image(f"plot/forgetting_curve.pdf", width=600, height=360)
-    time.sleep(3)
-    fig.write_image(f"plot/forgetting_curve.pdf", width=600, height=360)
+    fig.write_image(f"plot/forgetting_curve.png", width=1000, height=800)
 
 
 def raw_data_visualize():
@@ -357,8 +357,8 @@ def gru_model_visualize():
 
 
 if __name__ == "__main__":
-    difficulty_visualize1()
-    # forgetting_curve_visualize()
+    # difficulty_visualize1()
+    forgetting_curve_visualize()
     # raw_data_visualize()
     # dhp_model_visualize()
     # gru_model_visualize()

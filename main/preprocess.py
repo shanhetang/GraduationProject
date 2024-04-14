@@ -14,9 +14,12 @@ def cal_halflife(group):
         r_ivl_cnt = sum(
             group['delta_t']  # Δt
             * group['p_recall'].map(np.log)  # log_2(p)
-            * group['total_cnt']  #
+            * group['total_cnt']
         )
-        ivl_ivl_cnt = sum(group['delta_t'].map(lambda x: x ** 2) * group['total_cnt'])
+        ivl_ivl_cnt = sum(
+            group['delta_t'].map(lambda x: x ** 2)
+            * group['total_cnt']
+        )
         group['halflife'] = round(np.log(0.5) / (r_ivl_cnt / ivl_ivl_cnt), 4)
     else:
         group['halflife'] = 0.0
@@ -27,7 +30,8 @@ def cal_halflife(group):
 if __name__ == "__main__":
     data = pd.read_csv('../data/opensource_dataset_forgetting_curve.tsv', sep='\t', index_col=None)
     data = data[(data['p_recall'] < 1) & (data['p_recall'] > 0)]
-    data = data.groupby(by=['d', 'i', 'r_history', 't_history'],group_keys=False, as_index=False).apply(cal_halflife)  # 计算半衰期
+    data = data.groupby(by=['d', 'i', 'r_history', 't_history'],group_keys=False, as_index=False)\
+        .apply(cal_halflife)  # 计算半衰期
 
     data.reset_index(drop=True, inplace=True)
     data['p_recall'] = data['p_recall'].map(lambda x: round(x, 2))

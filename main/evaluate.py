@@ -5,7 +5,12 @@ from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error,
 
 
 models = ('HLR', 'HLR-lex', 'DHP', 'leitner', 'pimsleur', 'nn-GRU_nh-2_loss-sMAPE', 'nn-GRU_nh-2_loss-sMAPE-p',
-          'nn-GRU_nh-2_loss-sMAPE-t', 'nn-GRU_nh-2_loss-sMAPE-p-t')
+          'nn-GRU_nh-2_loss-sMAPE-t', 'nn-GRU_nh-2_loss-sMAPE-p-t',
+          'exp-Transformer-d_model=256-nhead=4-encoder_num=8',
+          'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+          'exp-Transformer-d_model=256-nhead=4-encoder_num=4-k=1',
+          'nn-GRU_nh-2_loss-sMAPE-atten')
+
 
 
 # models = ('pimsleur', 'leitner', 'HLR-lex', 'HLR', 'nn-GRU_nh-4_loss-sMAPE-p-t', 'nn-GRU_nh-4_loss-sMAPE-p',
@@ -36,9 +41,6 @@ for m in models:
         avg_smape.append(smape(data['h'], data['hh']))
         avg_mae_h.append(mean_absolute_error(data['h'], data['hh']))
         print(
-            f"{filename}\tmae(p): {avg_mae[i]:.4f}\tmse(p): {avg_mse[i]:.4f}\tmape(h): {avg_mape[i]:.4f}\t"
-            f"smape(h): {avg_smape[i]:.4f}\tmae(h): {avg_mae_h[i]:.4f}")
+            f"{filename}\tmae(p): {avg_mae[i]:.4f}\tmse(p): {avg_mse[i]:.4f}\tmape(h): {avg_mape[i]:.4f}\tsmape(h): {avg_smape[i]:.4f}\tmae(h): {avg_mae_h[i]:.4f}")
     print(
-        f"avg\tmae(p): {sum(avg_mae) / len(avg_mae):.4f}\tmse(p): {sum(avg_mse) / len(avg_mse):.4f}\t"
-        f"mape(h): {sum(avg_mape) / len(avg_mape):.4f}\tsmape(h): {sum(avg_smape) / len(avg_smape):.4f}\t"
-        f"mae(h): {sum(avg_mae_h) / len(avg_mae_h):.4f}")
+        f"avg\tmae(p): {sum(avg_mae) / len(avg_mae):.4f}\tmse(p): {sum(avg_mse) / len(avg_mse):.4f}\tmape(h): {sum(avg_mape) / len(avg_mape):.4f}\tsmape(h): {sum(avg_smape) / len(avg_smape):.4f}\tmae(h): {sum(avg_mae_h) / len(avg_mae_h):.4f}")

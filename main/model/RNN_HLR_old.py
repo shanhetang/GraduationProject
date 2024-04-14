@@ -35,42 +35,6 @@ def time_since(since):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
-class PositionalEncoding(nn.Module):
-    "Implement the PE function."
-
-    def __init__(self,
-                 d_model,
-                 dropout,
-                 max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        # 初始化Shape为(max_len, d_model)的PE (positional encoding)
-        pe = torch.zeros(max_len, d_model)
-        # 初始化一个tensor [[0, 1, 2, 3, ...]]
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        # 这里就是sin和cos括号中的内容，通过e和ln进行了变换
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
-        )
-        # 计算PE(pos, 2i)
-        pe[:, 0::2] = torch.sin(position * div_term)
-        # 计算PE(pos, 2i+1)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        # 为了方便计算，在最外面在unsqueeze出一个batch
-        pe = pe.unsqueeze(0)
-        # 如果一个参数不参与梯度下降，但又希望保存model的时候将其保存下来
-        # 这个时候就可以用register_buffer
-        self.register_buffer("pe", pe)
-
-    def forward(self, x):
-        """
-        x 为embedding后的inputs，例如(1,7, 128)，batch size为1,7个单词，单词维度为128
-        """
-        # 将x和positional encoding相加。
-        x = x + self.pe[:, :x.size(1)].requires_grad_(False)
-        return self.dropout(x)
-
 
 class RNN(nn.Module):
     def __init__(self, n_letters, n_hidden, n_categories, network, attention_flag = True):
@@ -81,26 +45,20 @@ class RNN(nn.Module):
         self.attention_flag = attention_flag
         if attention_flag:
             self.attention = nn.MultiheadAttention(embed_dim=self.n_hidden, num_heads=1)
-            self.positional_encoding = PositionalEncoding(self.n_hidden, dropout=0.0)
 
         if network == 'GRU':
             self.rnn = nn.GRU(self.n_input, self.n_hidden, 1)
-            self.rnn2 = nn.GRU(self.n_hidden, self.n_hidden, 1)
         elif network == "LSTM":
             self.rnn = nn.LSTM(self.n_input, self.n_hidden, 1)
-            self.rnn2 = nn.LSTM(self.n_hidden, self.n_hidden, 1)
         else:
             self.rnn = nn.RNN(self.n_input, self.n_hidden, 1)
-            self.rnn2 = nn.RNN(self.n_hidden, self.n_hidden, 1)
         self.fc = nn.Linear(self.n_hidden, self.n_out)
 
     def forward(self, x, hx):
         if self.attention_flag:
             x, h = self.rnn(x, hx=hx)
-            x = self.positional_encoding(x)
             attention_output, _ = self.attention(x, x, x)  # 注意力机制
             x = x + attention_output
-            x, h = self.rnn2(x, hx=h)
         else:
             x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x[-1]))
@@ -115,9 +73,7 @@ class SpacedRepetitionModel(object):
                  network="GRU"):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # 设置GPU加速
         print('device:', self.device)
-        self.attention_flag = True
-        if self.attention_flag:
-            print('attention:', self.attention_flag)
+        self.attention_flag = False
         self.n_hidden = hidden_nums  # 隐藏层数量
         self.omit_p = omit_p_history  # 是否省略p_history
         self.omit_t = omit_t_history  # 是否省略t_history

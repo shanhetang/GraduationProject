@@ -133,10 +133,12 @@ class TransformerModel(nn.Module):
                  d_model,
                  num_heads,
                  encode_layers_num,
+                 static_emb=64,
+                 static_size=10,
                  output_dim=1,
                  dropout=0.1,
                  kernel_size=3,
-                 pos='learnable'):
+                 pos='traditional'):
         """
         :param input_dim: 输入的特征数量
         :param d_model: 时间步嵌入
@@ -144,13 +146,16 @@ class TransformerModel(nn.Module):
         """
         super(TransformerModel, self).__init__()
         # 因果卷积层
-        self.conv = CausalConv1d(in_channels=input_dim, out_channels=d_model, kernel_size=kernel_size)
+        self.conv = CausalConv1d(in_channels=input_dim, out_channels=d_model-static_emb, kernel_size=kernel_size)
 
         # 定义位置编码器
         if pos == 'learnable':
-            self.positional_encoding = LearnablePositionalEncoding(d_model, dropout=dropout)
+            self.positional_encoding = LearnablePositionalEncoding(d_model-static_emb, dropout=dropout)
         elif pos == 'traditional':
-            self.positional_encoding = PositionalEncoding(d_model, dropout=dropout)
+            self.positional_encoding = PositionalEncoding(d_model-static_emb, dropout=dropout)
+
+        # 初始化静态嵌入层
+        self.static_embedding_layer = nn.Embedding(static_size, static_emb)
 
         # Transformer encoder
         self.encode_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, dropout=dropout,
@@ -166,19 +171,24 @@ class TransformerModel(nn.Module):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, sample_tensor):
+    def forward(self, sample_tensor,static_feature):
         """
         shape
          sample_tensor: [batch size, sequence length, feat_dim]
             output: [batch size, sequence length,  feat_dim]
         """
-        t_src = self.conv(sample_tensor)
 
+        t_src = self.conv(sample_tensor)
         t_src = self.positional_encoding(t_src)
 
-        t_output = self.transformer_encoder(src=t_src)
+        # 获取静态特征的嵌入向量
+        static_emb_vector = self.static_embedding_layer(static_feature)
+        # 将静态特征嵌入到输入特征中
+        static_emb_concat = static_emb_vector.unsqueeze(0).repeat(1, t_src.size(1), 1)  # 将静态变量扩展匹配形状
+        t_src = torch.cat([t_src, static_emb_concat], dim=-1)
 
-        output = self.decoder(t_output)
+        t_output = self.transformer_encoder(src=t_src)
+        output = torch.exp(self.decoder(t_output))
         return output
 
 
@@ -243,13 +253,11 @@ class SpacedRepetitionModel(object):
         print(f"Epoch num: {self.n_epoch}")
         self.print_every = int(self.train_cnt / 4)  # 每一个epoch汇报4次进度
         self.plot_every = self.train_cnt  # 每一个epoch汇报1次进度
-
         # SummaryWriter是PyTorch提供的用于将信息写入TensorBoard的工具
         self.writer = SummaryWriter(comment=self.write_title())
 
     def write_title(self):
-        title = f'{self.net_name}-d_model={self.d_model}-nhead={self.num_heads}-encoder_num={self.num_layers}' \
-                f'-loss={self.loss_name}'
+        title = f'static-{self.net_name}-d_model={self.d_model}-nhead={self.num_heads}-encoder_num={self.num_layers}'
         if self.kernel_size != 3:
             title += "-k=" + str(self.kernel_size)
         if self.omit_p:
@@ -267,10 +275,11 @@ class SpacedRepetitionModel(object):
                 self.net.train()
                 self.optimizer.zero_grad()  # 梯度清为0
                 # 半衰期、历史特征列表、半衰期张量、历史记录张量
-                halflife, line, halflife_tensor, line_tensor = self.sample2tensor(train_set.loc[index])
+                halflife, line, halflife_tensor, line_tensor, diffcult = self.sample2tensor(train_set.loc[index])
                 line_tensor = line_tensor.to(device=self.device)
                 halflife_tensor = halflife_tensor.to(device=self.device)
-                output = self.net(line_tensor)
+                diffcult = diffcult.to(device=self.device)
+                output = self.net(line_tensor,diffcult)
                 loss = self.loss(output[:, -1, 0], halflife_tensor)
                 loss.backward()
                 self.optimizer.step()
@@ -298,11 +307,12 @@ class SpacedRepetitionModel(object):
                         plot_count = 0
                         with torch.no_grad():
                             for plot_index in dataset.index:
-                                halflife, line, halflife_tensor, line_tensor = self.sample2tensor(
+                                halflife, line, halflife_tensor, line_tensor,diffcult = self.sample2tensor(
                                     dataset.loc[plot_index])
                                 line_tensor = line_tensor.to(device=self.device)
                                 halflife_tensor = halflife_tensor.to(device=self.device)
-                                output = self.net(line_tensor)
+                                diffcult = diffcult.to(device=self.device)
+                                output = self.net(line_tensor,diffcult)
                                 loss = self.loss(output[:, -1, 0], halflife_tensor)
                                 plot_loss += loss.data.item()
                                 plot_count += 1
@@ -337,10 +347,11 @@ class SpacedRepetitionModel(object):
             count = 0
             for index in tqdm(self.test_set.index):
                 sample = self.test_set.loc[index]
-                halflife, line, halflife_tensor, line_tensor = self.sample2tensor(sample)
+                halflife, line, halflife_tensor, line_tensor,diffcult = self.sample2tensor(sample)
                 line_tensor = line_tensor.to(device=self.device)
+                diffcult = diffcult.to(device=self.device)
                 halflife_tensor = halflife_tensor.to(device=self.device)
-                output = self.net(line_tensor)
+                output = self.net(line_tensor,diffcult)
                 output = output.cpu()
                 output = float(output[:, -1, 0])
 
@@ -375,6 +386,7 @@ class SpacedRepetitionModel(object):
         t_history = sample['t_history'].split(',')
         p_history = sample['p_history'].split(',')
 
+        diffculte = torch.tensor(int(sample['d'])-1)
         halflife_tensor = torch.tensor([halflife], dtype=torch.float32)
         sample_tensor = torch.zeros(1, len(r_history), self.feature_num)
         for li, response in enumerate(r_history):
@@ -391,4 +403,4 @@ class SpacedRepetitionModel(object):
                 sample_tensor[0][li][2] = float(p_history[li])
 
         # 返回半衰期、历史特征列表、半衰期张量、历史记录张量
-        return halflife, features, halflife_tensor, sample_tensor,
+        return halflife, features, halflife_tensor, sample_tensor,diffculte
