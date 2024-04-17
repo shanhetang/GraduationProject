@@ -237,7 +237,7 @@ class SpacedRepetitionModel(object):
             self.loss = smape_loss
 
         self.lr = 1e-5  # 学习率
-        self.weight_decay = 1e-3  # 权重衰减 正则化
+        self.weight_decay = 1e-4  # 权重衰减 正则化
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)  # Adam优化器
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=32)  # 余弦退火学习率调度器
 

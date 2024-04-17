@@ -1,3 +1,5 @@
+import math
+import os
 import time
 
 import numpy as np
@@ -18,24 +20,187 @@ camera = dict(
     center=dict(x=0, y=0, z=0),
     eye=dict(x=1.5, y=1.5, z=1.25)
 )
-plt.rcParams["font.family"]="SimHei"
+plt.rcParams["font.family"] = "SimHei"  # 处理中文无法正常显示的问题
+plt.rcParams['axes.unicode_minus'] = False  # 负号显示
+
+
+def concat_data(folder_path):
+    # 初始化一个空列表，用于存储读取的数据框
+    dfs = []
+    # 遍历指定文件夹下的所有文件
+    for filename in os.listdir(f'./result/{folder_path}'):
+        # 确保文件以 '.tsv' 结尾且不以 'repeat0_fold0' 开头
+        if filename.endswith('.tsv') and not filename.startswith('repeat0_fold0'):
+            # 构建文件的完整路径
+            file_path = os.path.join('./result/', folder_path, filename)
+            # 读取 TSV 文件，并将其存储到数据框中
+            df = pd.read_csv(file_path, sep='\t')
+            # 将数据框存储到列表中
+            dfs.append(df)
+
+    # 合并所有数据框
+    merged_df = pd.concat(dfs, ignore_index=True)
+    merged_df['halflife'] = np.log(merged_df['h'])
+    merged_df['sape'] = round(abs(merged_df['h'] - merged_df['hh']) / (merged_df['h'] + merged_df['hh']), 3)
+    return merged_df
+
+
+def pre_halflive_visualize():
+    # 绘制半衰期的分布
+    plt.figure(figsize=(10, 10))  # 绘制召回概率的直方图
+    ax = plt.subplot(111)
+    raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+    counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    ax.set_xlabel('半衰期（h）\n(a)', fontsize=28)
+    ax.set_ylabel('样本数量\n', fontsize=28)
+    ax.tick_params(axis='both', labelsize=22)
+    ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+    ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+                  ['1', '3', '10', '30', '100', '1000'])
+    ax.set_axisbelow(True)  # 网格显现在图形下方
+    # 绘制不同sMAPE的误差分布
+    ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+    ax2.set_ylabel('\nsMAPE', fontsize=28)
+    ax2.tick_params(axis='y', labelsize=22)
+    ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    files = [
+        'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+        'static-Transformer-d_model=256-nhead=4-encoder_num=4',
+        '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+        '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+        'DHP', 'HLR', 'HLR-lex']
+    colors = [
+        'green', 'purple',
+        'orange', 'yellow', 'brown', 'cyan',
+        'pink', 'magenta', 'lime']
+    labels = [
+        'Transformer-HLR','Transformer-HLR+d',
+        'GRU-HLR', 'GRU&Attention-HLR',
+        'GRU-HLR-t', 'GRU&Attention-HLR -t',
+        'DHP-HLR', 'HLR', 'HLR-lex']
+    for filename, color, label in zip(files, colors, labels):
+        raw = concat_data(filename)
+        raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+        bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+        ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+    # 添加图例
+    ax2.legend(loc='upper right', fontsize=14)
+
+    # ax = plt.subplot(132)
+    # raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+    # counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+    # bin_centers = (bins[:-1] + bins[1:]) / 2
+    # ax.set_xlabel('半衰期（h）\n(b)', fontsize=28)
+    # ax.set_ylabel('样本数量\n', fontsize=28)
+    # ax.tick_params(axis='both', labelsize=22)
+    # ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+    # ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+    #               ['1', '3', '10', '30', '100', '1000'])
+    # ax.set_axisbelow(True)  # 网格显现在图形下方
+    # # 绘制不同sMAPE的误差分布
+    # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+    # ax2.set_ylabel('\nsMAPE', fontsize=28)
+    # ax2.tick_params(axis='y', labelsize=22)
+    # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # files = [
+    #     'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+    #     'static-Transformer-d_model=256-nhead=4-encoder_num=4',]
+    #     # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+    #     # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+    #     # 'DHP', 'HLR', 'HLR-lex']
+    # colors = [
+    #     'green', 'purple',]
+    #     # 'orange', 'yellow', 'brown', 'cyan',
+    #     # 'pink', 'magenta', 'lime']
+    # labels = [
+    #     'Transformer-HLR', 'Transformer-HLR+d',]
+    #     # 'GRU-HLR', 'GRU&Attention-HLR',
+    #     # 'GRU-HLR-t', 'GRU&Attention-HLR -t',
+    #     # 'DHP-HLR', 'HLR', 'HLR-lex']
+    # for filename, color, label in zip(files, colors, labels):
+    #     raw = concat_data(filename)
+    #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+    #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+    #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+    # # 添加图例
+    # ax2.legend(loc='upper right', fontsize=14)
+    #
+    # ax = plt.subplot(133)
+    # raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+    # counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+    # bin_centers = (bins[:-1] + bins[1:]) / 2
+    # ax.set_xlabel('半衰期（h）\n(c)', fontsize=28)
+    # ax.set_ylabel('样本数量\n', fontsize=28)
+    # ax.tick_params(axis='both', labelsize=22)
+    # ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+    # ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+    #               ['1', '3', '10', '30', '100', '1000'])
+    # ax.set_axisbelow(True)  # 网格显现在图形下方
+    # # 绘制不同sMAPE的误差分布
+    # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+    # ax2.set_ylabel('\nsMAPE', fontsize=28)
+    # ax2.tick_params(axis='y', labelsize=22)
+    # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # files = [
+    #     # 'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+    #     # 'static-Transformer-d_model=256-nhead=4-encoder_num=4', ]
+    # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+    # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',]
+    # # 'DHP', 'HLR', 'HLR-lex']
+    # colors = [
+    #     # 'green', 'purple', ]
+    # 'orange', 'yellow', 'brown', 'cyan',]
+    # # 'pink', 'magenta', 'lime']
+    # labels = [
+    #     # 'Transformer-HLR', 'Transformer-HLR+d', ]
+    # 'GRU-HLR', 'GRU&Attention-HLR',
+    # 'GRU-HLR-t', 'GRU&Attention-HLR -t',]
+    # # 'DHP-HLR', 'HLR', 'HLR-lex']
+    # for filename, color, label in zip(files, colors, labels):
+    #     raw = concat_data(filename)
+    #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+    #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+    #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+    # # 添加图例
+    # ax2.legend(loc='upper right', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig("plot/长序列半衰期分布exp7.png")
+    plt.show()
+
+
+if __name__ == "__main__":
+    pre_halflive_visualize()
+    # difficulty_visualize1()
+    # forgetting_curve_visualize()
+    # raw_data_visualize()
+    # dhp_model_visualize()
+    # gru_model_visualize()
+    # dhp_policy_action_visualize()
+    # gru_policy_action_visualize()
 
 
 def difficulty_visualize1():
     # 读取数据集
     raw = pd.read_csv('../data/opensource_dataset_difficulty.tsv', sep='\t')
-    u = raw['p_recall'].mean() # 计算召回概率的均值和标准差
+    u = raw['p_recall'].mean()  # 计算召回概率的均值和标准差
     std = raw['p_recall'].std()
     print(u, std)
 
-    plt.figure(figsize=(20, 6))    # 绘制召回概率的直方图
+    plt.figure(figsize=(20, 6))  # 绘制召回概率的直方图
     ax = plt.subplot(121)
-    ax.hist(raw['p_recall'], bins=[0.15,0.2, 0.25, 0.3, 0.35,0.4, 0.45, 0.5,0.55, 0.6,0.65,0.7,0.75, 0.8,0.85,0.9, 0.95, 1.0], color='skyblue', edgecolor='black', density=False, align='mid')
+    ax.hist(raw['p_recall'],
+            bins=[0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0],
+            color='skyblue', edgecolor='black', density=False, align='mid')
     ax.set_xlabel('回忆概率（p）\n\n(a)', fontsize=28)
     ax.set_ylabel('频数', fontsize=28)
     ax.tick_params(axis='both', labelsize=22)
     ax.set_xlim(0.15, 1)
-    ax.spines[['top','right']].set_visible(False) # 不显示上方和右方的坐标轴框线
+    ax.spines[['top', 'right']].set_visible(False)  # 不显示上方和右方的坐标轴框线
     ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
     ax.set_axisbelow(True)  # 网格显现在图形下方
     # plt.tight_layout()
@@ -47,14 +212,15 @@ def difficulty_visualize1():
     ax = plt.subplot(122)
     # 设置背景颜色
     # ax.set_facecolor('#FFFFF0')
-    ax.hist(raw['d'], bins=[0.5, 1.5, 2.5,3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], color='skyblue', edgecolor='black', linewidth=2)
+    ax.hist(raw['d'], bins=[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5], color='skyblue', edgecolor='black',
+            linewidth=2)
     ax.set_xlabel('难度\n\n(b)', fontsize=28)
     ax.set_ylabel('频数', fontsize=28)
     ax.set_xlim(0.5, 11)
-    ax.set_xticks(range(1,11))
+    ax.set_xticks(range(1, 11))
     ax.tick_params(axis='x', labelsize=22)
     ax.tick_params(axis='y', labelsize=22)
-    ax.spines[['top','right']].set_visible(False)
+    ax.spines[['top', 'right']].set_visible(False)
     ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
     ax.set_axisbelow(False)  # 网格显现在图形下方
 
@@ -72,7 +238,7 @@ def difficulty_visualize():
     fig = px.histogram(raw, x="p_recall", nbins=20)
     fig.update_xaxes(title_text='回忆概率P', title_font=dict(size=26), tickfont=dict(size=22),
                      range=[0.15, 1])
-    fig.update_yaxes(title_text='数量',title_font=dict(size=26), tickfont=dict(size=22))
+    fig.update_yaxes(title_text='数量', title_font=dict(size=26), tickfont=dict(size=22))
     fig.update_layout(bargap=0.2, margin_t=10, margin_r=10, margin_b=10)
     fig.write_image("plot/distribution_p.png", width=600, height=360)
     # fig.show()
@@ -80,7 +246,7 @@ def difficulty_visualize():
 
     fig = px.histogram(raw, x="d", text_auto=False)
     fig.update_xaxes(title_text='难度', title_font=dict(size=26), tickfont=dict(size=22))
-    fig.update_yaxes(title_text='数量',title_font=dict(size=26), tickfont=dict(size=22))
+    fig.update_yaxes(title_text='数量', title_font=dict(size=26), tickfont=dict(size=22))
     fig.update_layout(bargap=0.2, margin_t=10, margin_r=10, margin_b=10)
     fig.write_image("plot/distribution_d.png", width=600, height=360)
     # fig.show()
@@ -89,7 +255,7 @@ def difficulty_visualize():
 
 def forgetting_curve_visualize():
     raw = pd.read_csv('../data/opensource_dataset_p_history.tsv', sep='\t')
-    # filters = [(3, '0,1', '0,1'), (3, '0,1,1', '0,1,3'), (3, '0,1,1', '0,1,4'), (3, '0,1,1', '0,1,5')]
+    filters = [(3, '0,1', '0,1'), (3, '0,1,1', '0,1,3'), (3, '0,1,1', '0,1,4'), (3, '0,1,1', '0,1,5')]
     # filters = [(3, '0,1,1', '0,1,3')]
     fig = go.Figure()
     color = ['blue', 'red', 'green', 'orange']
@@ -100,17 +266,17 @@ def forgetting_curve_visualize():
         t_history = f[2]
         tmp = raw[(raw['d'] == d) & (raw['r_history'] == r_history) & (raw['t_history'] == t_history)].copy()
         tmp.sort_values(by=['delta_t'], inplace=True)
-        tmp['size'] = np.log(tmp['total_cnt']) #标点大小
+        tmp['size'] = np.log(tmp['total_cnt'])  # 标点大小
         halflife = tmp['halflife'].values[0]
         tmp['fit_p_recall'] = np.power(2, -tmp['delta_t'] / halflife)  # 计算回忆概率
         fig.add_trace(
             go.Scatter(x=tmp['delta_t'], y=tmp['fit_p_recall'], mode='lines', name=f'halflife={halflife:.2f}'))
         fig.add_trace(
-            go.Scatter(x=tmp['delta_t'], y=tmp['p_recall'],mode='markers', marker_size=tmp['size'],
-                                 name = f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
+            go.Scatter(x=tmp['delta_t'], y=tmp['p_recall'], mode='markers', marker_size=tmp['size'],
+                       name=f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
         fig.update_traces(marker_color=color[i], selector=dict(name=f'halflife={halflife:.2f}'))
         fig.update_traces(marker_color=color[i],
-                          selector=dict(name = f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
+                          selector=dict(name=f"d={d}|r_{{1:i-1}}={r_history}|Δt_{{1:i-1}}={t_history}"))
     fig.update_layout(legend=dict(
         yanchor="bottom",
         y=0.01,
@@ -126,7 +292,7 @@ def forgetting_curve_visualize():
 
 
 def raw_data_visualize():
-    raw = pd.read_csv('./data/opensource_dataset_p_history.tsv', sep='\t')
+    raw = pd.read_csv('../data/opensource_dataset_p_history.tsv', sep='\t')
     raw.dropna(inplace=True)
     raw = raw[raw['group_cnt'] > 1000]
     raw['label'] = raw['r_history'] + '/' + raw['t_history']
@@ -154,6 +320,7 @@ def raw_data_visualize():
             zaxis=dict(title_font=dict(size=24), tickfont=dict(size=16)), ))
     fig.update_layout(margin_b=50, margin_t=50, margin_l=0, margin_r=50, margin_pad=100)
     fig.update_coloraxes(colorbar_tickfont_size=24)
+    print(1)
     fig.write_image(f"plot/DHP_model_raw.pdf", width=1000, height=1000)
     fig.show()
 
@@ -355,12 +522,129 @@ def gru_model_visualize():
     fig.write_image('./plot/GRU_forget_model.pdf', width=1000, height=1000)
     # fig.show()
 
-
-if __name__ == "__main__":
-    # difficulty_visualize1()
-    forgetting_curve_visualize()
-    # raw_data_visualize()
-    # dhp_model_visualize()
-    # gru_model_visualize()
-    # dhp_policy_action_visualize()
-    # gru_policy_action_visualize()
+# def pre_halflive_visualize():
+#     # 绘制半衰期的分布
+#     plt.figure(figsize=(10, 10))  # 绘制召回概率的直方图
+#     ax = plt.subplot(111)
+#     raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+#     counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+#     bin_centers = (bins[:-1] + bins[1:]) / 2
+#     ax.set_xlabel('半衰期（h）\n(a)', fontsize=28)
+#     ax.set_ylabel('样本数量\n', fontsize=28)
+#     ax.tick_params(axis='both', labelsize=22)
+#     ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+#     ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+#                   ['1', '3', '10', '30', '100', '1000'])
+#     ax.set_axisbelow(True)  # 网格显现在图形下方
+#     # 绘制不同sMAPE的误差分布
+#     ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+#     ax2.set_ylabel('\nsMAPE', fontsize=28)
+#     ax2.tick_params(axis='y', labelsize=22)
+#     ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     files = [
+#         'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+#         'static-Transformer-d_model=256-nhead=4-encoder_num=4',
+#         '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+#         '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+#         'DHP', 'HLR', 'HLR-lex']
+#     colors = [
+#         'green', 'purple',
+#         'orange', 'yellow', 'brown', 'cyan',
+#         'pink', 'magenta', 'lime']
+#     labels = [
+#         'Transformer-HLR','Transformer-HLR+d',
+#         'GRU-HLR', 'GRU&Attention-HLR',
+#         'GRU-HLR-t', 'GRU&Attention-HLR -t',
+#         'DHP-HLR', 'HLR', 'HLR-lex']
+#     for filename, color, label in zip(files, colors, labels):
+#         raw = concat_data(filename)
+#         raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+#         bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+#         ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+#     # 添加图例
+#     ax2.legend(loc='upper right', fontsize=14)
+#
+#     # ax = plt.subplot(132)
+#     # raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+#     # counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+#     # bin_centers = (bins[:-1] + bins[1:]) / 2
+#     # ax.set_xlabel('半衰期（h）\n(b)', fontsize=28)
+#     # ax.set_ylabel('样本数量\n', fontsize=28)
+#     # ax.tick_params(axis='both', labelsize=22)
+#     # ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+#     # ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     # ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+#     #               ['1', '3', '10', '30', '100', '1000'])
+#     # ax.set_axisbelow(True)  # 网格显现在图形下方
+#     # # 绘制不同sMAPE的误差分布
+#     # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+#     # ax2.set_ylabel('\nsMAPE', fontsize=28)
+#     # ax2.tick_params(axis='y', labelsize=22)
+#     # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     # files = [
+#     #     'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+#     #     'static-Transformer-d_model=256-nhead=4-encoder_num=4',]
+#     #     # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+#     #     # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+#     #     # 'DHP', 'HLR', 'HLR-lex']
+#     # colors = [
+#     #     'green', 'purple',]
+#     #     # 'orange', 'yellow', 'brown', 'cyan',
+#     #     # 'pink', 'magenta', 'lime']
+#     # labels = [
+#     #     'Transformer-HLR', 'Transformer-HLR+d',]
+#     #     # 'GRU-HLR', 'GRU&Attention-HLR',
+#     #     # 'GRU-HLR-t', 'GRU&Attention-HLR -t',
+#     #     # 'DHP-HLR', 'HLR', 'HLR-lex']
+#     # for filename, color, label in zip(files, colors, labels):
+#     #     raw = concat_data(filename)
+#     #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+#     #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+#     #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+#     # # 添加图例
+#     # ax2.legend(loc='upper right', fontsize=14)
+#     #
+#     # ax = plt.subplot(133)
+#     # raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+#     # counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+#     # bin_centers = (bins[:-1] + bins[1:]) / 2
+#     # ax.set_xlabel('半衰期（h）\n(c)', fontsize=28)
+#     # ax.set_ylabel('样本数量\n', fontsize=28)
+#     # ax.tick_params(axis='both', labelsize=22)
+#     # ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+#     # ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     # ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(1000)],
+#     #               ['1', '3', '10', '30', '100', '1000'])
+#     # ax.set_axisbelow(True)  # 网格显现在图形下方
+#     # # 绘制不同sMAPE的误差分布
+#     # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+#     # ax2.set_ylabel('\nsMAPE', fontsize=28)
+#     # ax2.tick_params(axis='y', labelsize=22)
+#     # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+#     # files = [
+#     #     # 'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+#     #     # 'static-Transformer-d_model=256-nhead=4-encoder_num=4', ]
+#     # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+#     # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',]
+#     # # 'DHP', 'HLR', 'HLR-lex']
+#     # colors = [
+#     #     # 'green', 'purple', ]
+#     # 'orange', 'yellow', 'brown', 'cyan',]
+#     # # 'pink', 'magenta', 'lime']
+#     # labels = [
+#     #     # 'Transformer-HLR', 'Transformer-HLR+d', ]
+#     # 'GRU-HLR', 'GRU&Attention-HLR',
+#     # 'GRU-HLR-t', 'GRU&Attention-HLR -t',]
+#     # # 'DHP-HLR', 'HLR', 'HLR-lex']
+#     # for filename, color, label in zip(files, colors, labels):
+#     #     raw = concat_data(filename)
+#     #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+#     #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+#     #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+#     # # 添加图例
+#     # ax2.legend(loc='upper right', fontsize=14)
+#
+#     plt.tight_layout()
+#     plt.savefig("plot/半衰期分布exp2.png")
+#     plt.show()

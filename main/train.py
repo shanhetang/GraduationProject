@@ -17,8 +17,8 @@ def load_data(input_file):
     dataset = dataset[dataset['halflife'] > 0]
     dataset = dataset[dataset['i'] > 0]
     dataset = dataset[
-        dataset['p_history'].map(lambda x: len(str(x).split(','))) == dataset['t_history'].map(
-            lambda x: len(x.split(',')))]
+        dataset['p_history'].map(lambda x: len(str(x).split(','))) ==
+        dataset['t_history'].map(lambda x: len(x.split(',')))]
     # dataset.drop_duplicates(subset=['r_history', 't_history', 'p_history', 'difficulty'], inplace=True)
     # dataset['weight'] = dataset['total_cnt'] / dataset['total_cnt'].sum()
     # dataset['weight'] = dataset['total_cnt'] / dataset['total_cnt'].sum()
@@ -78,7 +78,7 @@ argparser.add_argument('-loss', action="store", dest="loss", default='sMAPE', he
 argparser.add_argument('input_file', action="store", help='log file for training')
 
 if __name__ == "__main__":
-    random.seed(2022)
+    random.seed(2024)
     args = argparser.parse_args()
     sys.stderr.write('method = "%s"\n' % args.method)
     if args.l:
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # 读取数据 拆分训练集和测试集
     # TODO
     dataset = load_data(args.input_file)
-    test = dataset.sample(frac=0.8, random_state=2022)
+    test = dataset.sample(frac=0.8, random_state=2024)
     train = dataset.drop(index=test.index)
     sys.stderr.write(str(test.shape)+"\n")
     sys.stderr.write(str(train.shape)+"\n")
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     if not args.train:
         if not args.test:
             sys.stderr.write("without test and train\n")
-            train_train, train_test = train_test_split(train, test_size=0.5, random_state=2022)
+            train_train, train_test = train_test_split(train, test_size=0.5, random_state=2024)
             sys.stderr.write('|train| = %d\n' % len(train_train))
             sys.stderr.write('|test|  = %d\n' % len(train_test))
             if args.method in rnn_algo:
@@ -126,8 +126,8 @@ if __name__ == "__main__":
                 model.eval(0, 0)
         else:  # -test
             sys.stderr.write("-test")
-            # kf = KFold(n_splits=5, shuffle=True, random_state=2022)
-            kf = RepeatedKFold(n_splits=2, n_repeats=5, random_state=2022)
+            # kf = KFold(n_splits=5, shuffle=True, random_state=2024)
+            kf = RepeatedKFold(n_splits=2, n_repeats=5, random_state=2024)
             for idx, (train_index, test_fold) in enumerate(kf.split(test)):
                 train_fold = dataset.iloc[train_index]
                 test_fold = dataset.iloc[test_fold]
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             print("MAPE(h)", test['MAPE(h)'].mean())
     else:  # -train
         print("-train")
-        # train_train, train_test = train_test_split(dataset, test_size=0.2, random_state=2022)
+        # train_train, train_test = train_test_split(dataset, test_size=0.2, random_state=2024)
         sys.stderr.write('|train| = %d\n' % len(dataset))
         if args.method in rnn_algo:
             from model.RNN_HLR import SpacedRepetitionModel
