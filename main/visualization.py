@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+from matplotlib.ticker import FuncFormatter
 import tqdm
 
 from model.utils import *
@@ -45,11 +46,26 @@ def concat_data(folder_path):
     return merged_df
 
 
-def pre_halflive_visualize():
+def plot_halflife_distribution(ax, raw, flag):
+    counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    ax.set_xlabel(f'半衰期（h）\n({flag})', fontsize=28)
+    ax.set_ylabel('样本数量\n', fontsize=28)
+    ax.tick_params(axis='both', labelsize=22)
+    ax.spines[['top', 'right']].set_visible(True)  # 上方和右方的坐标轴框线
+    ax.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    ax.set_xticks([0, math.log(3), math.log(10), math.log(30), math.log(100), math.log(300), math.log(1000)],
+                  ['1', '3', '10', '30', '100', '300', '1000'])
+    ax.set_axisbelow(True)  # 网格显现在图形下方
+    return bins, bin_centers
+
+
+def pre_halflive_visualize1():
     # 绘制半衰期的分布
     plt.figure(figsize=(10, 10))  # 绘制召回概率的直方图
     ax = plt.subplot(111)
     raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+    # raw = raw[raw['r_history'].str.len() > 20]
     counts, bins, _ = ax.hist(raw['halflife'], bins=40, color='skyblue', edgecolor='black', density=False, align='mid')
     bin_centers = (bins[:-1] + bins[1:]) / 2
     ax.set_xlabel('半衰期（h）\n(a)', fontsize=28)
@@ -67,16 +83,19 @@ def pre_halflive_visualize():
     ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
     files = [
         'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
-        'static-Transformer-d_model=256-nhead=4-encoder_num=4',
-        '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
-        '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
-        'DHP', 'HLR', 'HLR-lex']
+        'exp-Transformer-d_model=256-nhead=4-encoder_num=4-p',
+        'exp-Transformer-d_model=256-nhead=4-encoder_num=4-t',
+        'exp-Transformer-d_model=256-nhead=4-encoder_num=4-p-t',
+        'static-Transformer-d_model=256-nhead=4-encoder_num=4', ]
+    # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+    # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',]
+    # 'DHP', 'HLR', 'HLR-lex']
     colors = [
         'green', 'purple',
         'orange', 'yellow', 'brown', 'cyan',
         'pink', 'magenta', 'lime']
     labels = [
-        'Transformer-HLR','Transformer-HLR+d',
+        'Transformer-HLR', 'Transformer-HLR-p', 'Transformer-HLR-t', 'Transformer-HLR-p-t', 'Transformer-HLR+d',
         'GRU-HLR', 'GRU&Attention-HLR',
         'GRU-HLR-t', 'GRU&Attention-HLR -t',
         'DHP-HLR', 'HLR', 'HLR-lex']
@@ -169,7 +188,140 @@ def pre_halflive_visualize():
     # ax2.legend(loc='upper right', fontsize=14)
 
     plt.tight_layout()
-    plt.savefig("plot/长序列半衰期分布exp7.png")
+    plt.savefig("plot/trans序列半衰期分布exp7.png")
+    plt.show()
+
+
+def pre_halflive_visualize():
+    raw = concat_data('exp-Transformer-d_model=256-nhead=4-encoder_num=4')
+    files = [
+        'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+        'static-Transformer-d_model=256-nhead=4-encoder_num=4',
+        '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+        '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+        'DHP', 'HLR', 'HLR-lex']
+    colors = [
+        'green', 'purple',
+        'orange', 'yellow', 'brown', 'cyan',
+        'pink', 'magenta', 'lime']
+    labels = [
+        'Transformer-HLR', 'Transformer-HLR+d',
+        'GRU-HLR', 'GRU&Attention-HLR',
+        'GRU-HLR-t', 'GRU&Attention-HLR -t',
+        'DHP-HLR', 'HLR', 'HLR-lex']
+    plt.figure(figsize=(20, 20))
+    gs = plt.GridSpec(2, 4)
+    ax1 = plt.subplot(gs[0, 1:3])
+    ax_list = [ax1]
+    ax2 = plt.subplot(gs[1, :2])
+    ax3 = plt.subplot(gs[1, 2:])
+    ax_list.extend([ax2, ax3])
+
+    # 自定义y轴格式为百分比
+    def to_percent(y, position):
+        return '{:.2f}%'.format(100 * y)
+
+    for i, ax in enumerate(ax_list):
+        tmp_files = None
+        tmp_colors = None
+        tmp_labels = None
+        flag = 'a'
+        if i == 0:
+            tmp_files = files
+            tmp_colors = colors
+            tmp_labels = labels
+        elif i == 1:
+            tmp_files = files[0:2]
+            tmp_colors = colors[0:2]
+            tmp_labels = labels[0:2]
+            flag = 'b'
+        elif i == 2:
+            tmp_files = files[2:6]
+            tmp_colors = colors[2:6]
+            tmp_labels = labels[2:6]
+            flag = 'c'
+        bins, bin_centers = plot_halflife_distribution(ax, raw,flag)
+        # 绘制不同sMAPE的误差分布
+        ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+        ax2.set_ylabel('\nsMAPE', fontsize=28)
+        ax2.tick_params(axis='y', labelsize=22)
+        ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+        formatter = FuncFormatter(to_percent)
+        ax2.yaxis.set_major_formatter(formatter)
+
+        for filename, color, label in zip(tmp_files, tmp_colors, tmp_labels):
+            raw = concat_data(filename)
+            raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+            bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+            ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+        # 添加图例
+        ax2.legend(loc='upper right', fontsize=18)
+
+    # plot_halflife_distribution(ax, raw)
+    # # 绘制不同sMAPE的误差分布
+    # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+    # ax2.set_ylabel('\nsMAPE', fontsize=28)
+    # ax2.tick_params(axis='y', labelsize=22)
+    # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # files = [
+    #     'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+    #     'static-Transformer-d_model=256-nhead=4-encoder_num=4', ]
+    # # '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+    # # '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten',
+    # # 'DHP', 'HLR', 'HLR-lex']
+    # colors = [
+    #     'green', 'purple', ]
+    # # 'orange', 'yellow', 'brown', 'cyan',
+    # # 'pink', 'magenta', 'lime']
+    # labels = [
+    #     'Transformer-HLR', 'Transformer-HLR+d', ]
+    # # 'GRU-HLR', 'GRU&Attention-HLR',
+    # # 'GRU-HLR-t', 'GRU&Attention-HLR -t',
+    # # 'DHP-HLR', 'HLR', 'HLR-lex']
+    # for filename, color, label in zip(files, colors, labels):
+    #     raw = concat_data(filename)
+    #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+    #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+    #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+    # # 添加图例
+    # # ax2.legend(loc='upper right', fontsize=14)
+    # formatter = FuncFormatter(to_percent)
+    # ax2.yaxis.set_major_formatter(formatter)
+    #
+    # ax = plt.subplot(224)
+    # plot_halflife_distribution(ax, raw)
+    # # 绘制不同sMAPE的误差分布
+    # ax2 = ax.twinx()  # 在 y 轴右边创建一个新的轴对象
+    # ax2.set_ylabel('\nsMAPE', fontsize=28)
+    # ax2.tick_params(axis='y', labelsize=22)
+    # ax2.yaxis.grid(linewidth=0.5, color="grey", alpha=0.5)
+    # files = [
+    #     # 'exp-Transformer-d_model=256-nhead=4-encoder_num=4',
+    #     # 'static-Transformer-d_model=256-nhead=4-encoder_num=4', ]
+    #     '2nn-GRU_nh-2_loss-sMAPE', '2nn-GRU_nh-2_loss-sMAPE-atten',
+    #     '2nn-GRU_nh-2_loss-sMAPE-t', '2nn-GRU_nh-2_loss-sMAPE-t-atten', ]
+    # # 'DHP', 'HLR', 'HLR-lex']
+    # colors = [
+    #     # 'green', 'purple', ]
+    #     'orange', 'yellow', 'brown', 'cyan', ]
+    # # 'pink', 'magenta', 'lime']
+    # labels = [
+    #     # 'Transformer-HLR', 'Transformer-HLR+d', ]
+    #     'GRU-HLR', 'GRU&Attention-HLR',
+    #     'GRU-HLR-t', 'GRU&Attention-HLR -t', ]
+    # # 'DHP-HLR', 'HLR', 'HLR-lex']
+    # for filename, color, label in zip(files, colors, labels):
+    #     raw = concat_data(filename)
+    #     raw['bin'] = pd.cut(raw['halflife'], bins=bins)
+    #     bin_means = raw.groupby('bin', observed=True)['sape'].mean()
+    #     ax2.plot(bin_centers, bin_means, color=color, linestyle='-', marker='', markersize=5, label=label)
+    # # 添加图例
+    # # ax2.legend(loc='upper right', fontsize=14)
+    # formatter = FuncFormatter(to_percent)
+    # ax2.yaxis.set_major_formatter(formatter)
+
+    plt.tight_layout()
+    plt.savefig("plot/半衰期分布exp6.png")
     plt.show()
 
 
